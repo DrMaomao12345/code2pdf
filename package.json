@@ -1,0 +1,39 @@
+{
+  "name": "code2pdf",
+  "version": "1.0.0",
+  "description": "Export source code to beautiful PDF with VSCode-compatible syntax highlighting",
+  "type": "module",
+  "bin": {
+    "code2pdf": "./bin/code2pdf.js"
+  },
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node bin/code2pdf.js",
+    "ui": "node src/server.js",
+    "example": "node bin/code2pdf.js src/index.js -o example.pdf"
+  },
+  "keywords": [
+    "code",
+    "pdf",
+    "syntax-highlighting",
+    "vscode",
+    "themes",
+    "export",
+    "shiki"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "express": "^4.19.2",
+    "commander": "^12.1.0",
+    "ora": "^8.1.1",
+    "puppeteer": "^22.12.0",
+    "shiki": "^1.10.0"
+  }
+}
