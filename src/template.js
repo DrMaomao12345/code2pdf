@@ -58,6 +58,7 @@ export function buildHtml({
   indentSize = 2,
   lineNumbers = false,
   wrapLines = true,
+  indentGuides = false,
   pageSize = 'A4',
 }) {
   const dark = isDark(bg)
@@ -65,14 +66,17 @@ export function buildHtml({
   const borderColor = dark ? adjustColor(bg, 30) : adjustColor(bg, -30)
   const lineNumColor = dark ? adjustColor(bg, 80) : adjustColor(bg, -80)
   const lineNumBorderColor = dark ? adjustColor(bg, 50) : adjustColor(bg, -50)
+  const indentGuideColor = dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)'
   // lineHeight and indentSize are passed in as parameters
   const lineNumWidth = 42
 
   // Theme display label
   const themeLabel = BUILTIN_THEMES[themeId]?.label || themeId
 
-  // Language tag color (accent) — use a pleasant blue/purple
-  const accentColor = dark ? '#4a9eff' : '#0066cc'
+  // Language pill — theme-aware, always legible (uses theme's fg)
+  const pillBg     = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
+  const pillBorder = dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.14)'
+  const dotColor   = dark ? '#4a9eff' : '#3b82f6'
 
   const displayName = filename ? path.basename(filename) : 'untitled'
 
@@ -134,11 +138,11 @@ export function buildHtml({
     }
 
     .file-dot {
-      width: 10px;
-      height: 10px;
+      width: 9px;
+      height: 9px;
       border-radius: 50%;
-      background: ${accentColor};
-      opacity: 0.7;
+      background: ${dotColor};
+      opacity: 0.85;
       flex-shrink: 0;
     }
 
@@ -153,15 +157,16 @@ export function buildHtml({
     }
 
     .file-lang {
-      background: ${accentColor}22;
-      color: ${accentColor};
-      border: 1px solid ${accentColor}44;
+      background: ${pillBg};
+      color: ${fg};
+      border: 1px solid ${pillBorder};
       padding: 1px 7px;
       border-radius: 3px;
       font-size: ${Math.max(fontSize - 2, 8)}px;
       letter-spacing: 0.05em;
       text-transform: uppercase;
       flex-shrink: 0;
+      opacity: 0.85;
     }
 
     .file-theme {
@@ -199,6 +204,18 @@ export function buildHtml({
       break-inside: avoid;
       ${lineNumbers ? 'padding-left: ' + (lineNumWidth + 16) + 'px;' : 'padding-left: 0;'}
       position: relative;
+      ${indentGuides ? `
+      background-image: repeating-linear-gradient(
+        to right,
+        ${indentGuideColor} 0,
+        ${indentGuideColor} 1px,
+        transparent 1px,
+        transparent ${indentSize}ch
+      );
+      background-origin: content-box;
+      background-clip: content-box;
+      background-repeat: repeat;
+      ` : ''}
     }
 
     /* Line numbers via CSS counter */

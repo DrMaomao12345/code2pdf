@@ -86,6 +86,7 @@ program
   .option('-l, --language <lang>', 'Override language detection (e.g. python, go, rust)')
   .option('-s, --font-size <n>', 'Font size in px (default: 12)', (v) => parseInt(v, 10), 12)
   .option('-n, --line-numbers', 'Show line numbers', false)
+  .option('--indent-guides', 'Draw vertical indent guide lines', false)
   .option('--no-wrap', 'Disable line wrapping (long lines extend beyond page)')
   .option(
     '-p, --page-size <size>',
@@ -172,6 +173,7 @@ try {
     fontSize: opts.fontSize,
     lineNumbers: opts.lineNumbers,
     wrapLines: opts.wrap,
+    indentGuides: opts.indentGuides,
     pageSize: opts.pageSize,
     landscape: opts.landscape,
     scale: opts.scale,

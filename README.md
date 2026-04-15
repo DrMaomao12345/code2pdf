@@ -12,8 +12,9 @@ Export source code to beautiful PDF files with VSCode-compatible syntax highligh
 - **50+ 内置主题** — One Dark Pro、Dracula、Tokyo Night、GitHub、Catppuccin 等
 - **自定义主题** — 直接导入任何 VSCode `.json` 主题文件
 - **100+ 编程语言** — 自动识别语言，也可手动指定
-- **行号显示** — 可选显示行号
-- **多种页面尺寸** — A4、Letter、A3、Legal 等
+- **本地 Web UI** — `npm run ui` 启动浏览器可视化界面，拖拽文件、实时预览、分页提示
+- **精细排版** — 字号、行间距、缩进、缩进参考线、行号、自动换行均可调整
+- **多种页面尺寸** — A4、Letter、A3、Legal + 横向/纵向 + 内容缩放
 - **CLI + Node.js API** — 命令行工具 + 可编程接口
 
 ---
@@ -46,6 +47,9 @@ code2pdf main.py -t dracula
 
 # 显示行号，调整字号
 code2pdf main.py --line-numbers --font-size 11
+
+# 显示缩进参考线（便于查看嵌套结构）
+code2pdf main.py --indent-guides
 
 # 使用自己的 VSCode 主题 JSON 文件
 code2pdf main.py -t ~/themes/my-custom-theme.json
@@ -142,6 +146,7 @@ Options:
   -l, --language <lang>   Override language detection
   -s, --font-size <n>     Font size in px (default: 12)
   -n, --line-numbers      Show line numbers (default: false)
+  --indent-guides         Draw vertical indent guide lines (default: false)
   --no-wrap               Disable line wrapping
   -p, --page-size <size>  Page size: a4, letter, a3, legal, a5, tabloid
                           (default: "a4")
@@ -190,6 +195,7 @@ convertToPdf(options: {
   fontSize?: number      // 字号 (default: 12)
   lineNumbers?: boolean  // 显示行号 (default: false)
   wrapLines?: boolean    // 换行 (default: true)
+  indentGuides?: boolean // 缩进参考线 (default: false)
   pageSize?: string      // 页面尺寸 (default: 'a4')
   landscape?: boolean    // 横向 (default: false)
   scale?: number         // 缩放 (default: 1.0)
@@ -218,13 +224,39 @@ code2pdf --list-languages
 
 ---
 
+## 本地 Web UI / Local Web UI
+
+除 CLI 外，项目附带一个本地 Web 界面，可在浏览器中拖拽文件、切换主题、
+实时预览、并看到精确的分页提示：
+
+```bash
+npm run ui
+```
+
+启动后会自动打开 `http://localhost:3131`。
+
+特性：
+
+- 拖拽或点击上传任意源代码文件
+- 侧边栏搜索 50+ 主题，支持导入自定义 VSCode `.json` 主题
+- 字号、行间距、缩进、行号、自动换行、缩进参考线即时生效
+- 页面尺寸 / 横竖向 / 内容缩放可调，**预览中显示分页提示线**，所见即所得
+- 深色 / 浅色界面主题一键切换
+
+---
+
 ## 开发 / Development
 
 ```bash
-git clone https://github.com/yourname/code2pdf
+git clone https://github.com/DrMaomao12345/code2pdf
 cd code2pdf
 npm install
+
+# CLI
 node bin/code2pdf.js src/index.js --line-numbers
+
+# Web UI
+npm run ui
 ```
 
 ---

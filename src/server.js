@@ -74,7 +74,7 @@ app.post('/api/export', async (req, res) => {
       code = '', filename = 'code.txt', lang = 'text',
       theme = 'one-dark-pro', customThemeJson = null,
       fontSize = 12, lineHeight = 1.6, indentSize = 2,
-      lineNumbers = false, wrapLines = true,
+      lineNumbers = false, wrapLines = true, indentGuides = false,
       pageSize = 'a4', landscape = false, scale = 1.0,
     } = req.body
 
@@ -85,7 +85,8 @@ app.post('/api/export', async (req, res) => {
     const { html: codeHtml, bg, fg } = await highlight(code, { lang, themeId, customTheme })
     const html = buildHtml({
       codeHtml, filename, language: lang, themeId,
-      bg, fg, fontSize, lineHeight, indentSize, lineNumbers, wrapLines, pageSize,
+      bg, fg, fontSize, lineHeight, indentSize,
+      lineNumbers, wrapLines, indentGuides, pageSize,
     })
 
     await generatePdf({ html, outputPath: tmpPath, pageSize, landscape, scale })

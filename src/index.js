@@ -27,6 +27,7 @@ export { getPageSizes } from './pdfGenerator.js'
  * @param {number}   [options.fontSize]    - Font size in px (default 12)
  * @param {boolean}  [options.lineNumbers] - Show line numbers (default false)
  * @param {boolean}  [options.wrapLines]   - Wrap long lines (default true)
+ * @param {boolean}  [options.indentGuides]- Draw vertical indent guide lines (default false)
  * @param {string}   [options.pageSize]    - Page size: a4, letter, a3... (default 'a4')
  * @param {boolean}  [options.landscape]   - Landscape orientation (default false)
  * @param {number}   [options.scale]       - Scale factor 0.1–2.0 (default 1.0)
@@ -41,6 +42,7 @@ export async function convertToPdf(options) {
     fontSize = 12,
     lineNumbers = false,
     wrapLines = true,
+    indentGuides = false,
     pageSize = 'a4',
     landscape = false,
     scale = 1.0,
@@ -76,6 +78,7 @@ export async function convertToPdf(options) {
     fontSize,
     lineNumbers,
     wrapLines,
+    indentGuides,
     pageSize,
   })
 
@@ -95,6 +98,7 @@ export async function convertToPdf(options) {
  * @param {number}   [options.fontSize]
  * @param {boolean}  [options.lineNumbers]
  * @param {boolean}  [options.wrapLines]
+ * @param {boolean}  [options.indentGuides]
  * @param {string}   [options.pageSize]
  * @param {boolean}  [options.landscape]
  * @param {number}   [options.scale]
@@ -110,6 +114,7 @@ export async function convertCodeToPdf(options) {
     fontSize = 12,
     lineNumbers = false,
     wrapLines = true,
+    indentGuides = false,
     pageSize = 'a4',
     landscape = false,
     scale = 1.0,
@@ -133,6 +138,7 @@ export async function convertCodeToPdf(options) {
     fontSize,
     lineNumbers,
     wrapLines,
+    indentGuides,
     pageSize,
   })
 

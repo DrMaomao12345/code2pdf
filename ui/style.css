@@ -571,6 +571,20 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 }
 .preview-code .line { display: block; min-height: 1.2em; }
 
+/* ── Indent guides in preview ────────────────────────────────── */
+.preview-code.ig .line {
+  background-image: repeating-linear-gradient(
+    to right,
+    rgba(128, 128, 128, 0.22) 0,
+    rgba(128, 128, 128, 0.22) 1px,
+    transparent 1px,
+    transparent calc(var(--pv-tab-size, 2) * 1ch)
+  );
+  background-origin: content-box;
+  background-clip: content-box;
+  background-repeat: repeat;
+}
+
 /* ── Line numbers in preview (CSS counter) ───────────────────── */
 .preview-code.ln pre code { counter-reset: ln; }
 .preview-code.ln .line {
