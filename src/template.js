@@ -8,10 +8,19 @@ import path from 'path'
 import { BUILTIN_THEMES } from './themeManager.js'
 
 /**
+ * Normalize a hex color to 6-digit form (e.g. "#fff" -> "#ffffff").
+ */
+function normalizeHex(hex) {
+  let h = hex.replace('#', '')
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]
+  return '#' + h
+}
+
+/**
  * Slightly darken or lighten a hex color for UI accents.
  */
 function adjustColor(hex, amount) {
-  const num = parseInt(hex.replace('#', ''), 16)
+  const num = parseInt(normalizeHex(hex).replace('#', ''), 16)
   const r = Math.min(255, Math.max(0, (num >> 16) + amount))
   const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amount))
   const b = Math.min(255, Math.max(0, (num & 0xff) + amount))
@@ -22,7 +31,7 @@ function adjustColor(hex, amount) {
  * Check if a hex color is "dark" (for contrast decisions).
  */
 function isDark(hex) {
-  const num = parseInt(hex.replace('#', ''), 16)
+  const num = parseInt(normalizeHex(hex).replace('#', ''), 16)
   const r = (num >> 16) & 0xff
   const g = (num >> 8) & 0xff
   const b = num & 0xff
@@ -66,9 +75,10 @@ export function buildHtml({
   const borderColor = dark ? adjustColor(bg, 30) : adjustColor(bg, -30)
   const lineNumColor = dark ? adjustColor(bg, 80) : adjustColor(bg, -80)
   const lineNumBorderColor = dark ? adjustColor(bg, 50) : adjustColor(bg, -50)
-  const indentGuideColor = dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)'
+  const indentGuideColor = dark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'
   // lineHeight and indentSize are passed in as parameters
-  const lineNumWidth = 42
+  const lineNumWidth = 44
+  const lineNumPadL  = lineNumWidth + 10   // gap between gutter border and code
 
   // Theme display label
   const themeLabel = BUILTIN_THEMES[themeId]?.label || themeId
@@ -93,6 +103,36 @@ export function buildHtml({
         .join(';')
       return `style="${filtered}"`
     })
+
+  // Strip whitespace (newlines) between .line spans — inside <pre> they'd be
+  // rendered as visible line breaks, creating gaps between lines.
+  // This must be unconditional: shiki always emits newlines between .line spans,
+  // and with white-space: pre-wrap they render as visible ~19px gaps.
+  processedHtml = processedHtml.replace(/<\/span>\s+<span class="line"/g, '</span><span class="line"')
+
+  // When indentGuides is on, inject absolutely-positioned <span class="indent-guide">
+  // elements for each indent level. Because they use position:absolute + top:0 + bottom:0,
+  // each guide fills the FULL height of its .line parent. Since .line blocks stack with
+  // no gap, consecutive lines' guides form one perfectly continuous vertical rule.
+  const igOffset = lineNumbers ? `${lineNumPadL}px` : '0px'
+  if (indentGuides) {
+    processedHtml = processedHtml.replace(
+      /(<span class="line"[^>]*>)(<span[^>]*>)?([ \t]+)/g,
+      (_m, lineOpen, tokenOpen = '', ws) => {
+        const expanded = ws.replace(/\t/g, ' '.repeat(indentSize))
+        const levels = Math.floor(expanded.length / indentSize)
+        if (levels === 0) return _m
+        let guides = ''
+        for (let i = 0; i < levels; i++) {
+          const left = igOffset === '0px'
+            ? `${i * indentSize}ch`
+            : `calc(${igOffset} + ${i * indentSize}ch)`
+          guides += `<span class="indent-guide" style="left:${left}"></span>`
+        }
+        return lineOpen + guides + (tokenOpen || '') + ws
+      }
+    )
+  }
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -202,39 +242,49 @@ export function buildHtml({
       display: block;
       min-height: ${lineHeight}em;
       break-inside: avoid;
-      ${lineNumbers ? 'padding-left: ' + (lineNumWidth + 16) + 'px;' : 'padding-left: 0;'}
+      ${lineNumbers ? 'padding-left: ' + lineNumPadL + 'px;' : 'padding-left: 0;'}
       position: relative;
-      ${indentGuides ? `
-      background-image: repeating-linear-gradient(
-        to right,
-        ${indentGuideColor} 0,
-        ${indentGuideColor} 1px,
-        transparent 1px,
-        transparent ${indentSize}ch
-      );
-      background-origin: content-box;
-      background-clip: content-box;
-      background-repeat: repeat;
-      ` : ''}
     }
 
-    /* Line numbers via CSS counter */
+    /* Indent guides — absolutely positioned, fixed height = one line.
+       For non-wrapped lines the guide fills the full .line height so
+       consecutive guides form one continuous vertical rule.
+       For wrapped lines the guide only covers the first visual line,
+       avoiding the guide cutting through wrapped text. */
+    .indent-guide {
+      position: absolute;
+      top: 0;
+      height: ${lineHeight}em;
+      width: 0;
+      border-left: 1px solid ${indentGuideColor};
+      box-sizing: content-box;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* Line numbers via CSS counter — ::before stretched to full .line height
+       so the right separator border is continuous from top to bottom. */
     ${lineNumbers ? `
     .line::before {
       counter-increment: line-number;
       content: counter(line-number);
       position: absolute;
       left: 0;
+      top: 0;
+      bottom: 0;
       width: ${lineNumWidth}px;
-      padding-right: 10px;
-      text-align: right;
+      padding: 0 10px 0 0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      box-sizing: border-box;
       color: ${lineNumColor};
       border-right: 1px solid ${lineNumBorderColor};
-      margin-right: 14px;
       user-select: none;
       pointer-events: none;
       font-size: 0.85em;
-      line-height: ${lineHeight / 0.85}em;
+      line-height: 1;
+      font-family: inherit;
     }` : ''}
 
     /* ── Page footer with page numbers ───────────────────── */

@@ -42,7 +42,18 @@ const state = {
   previewDebounce: null,
   exporting: false,
   uiMode: 'light',
+  rawHtml: '',
+  presets: [null, null, null],
 }
+
+// ── Preset settings keys (what we store/apply) ────────────────
+const PRESET_KEYS = [
+  'selectedTheme', 'customThemeJson', 'customThemeLabel',
+  'fontSize', 'lineHeight', 'indentSize',
+  'lineNumbers', 'wrapLines', 'indentGuides',
+  'pageSize', 'landscape', 'scale',
+]
+const PRESETS_LS_KEY = 'code2pdf-presets'
 
 // ── DOM refs ──────────────────────────────────────────────────
 const $ = id => document.getElementById(id)
@@ -78,6 +89,7 @@ const prevFilename  = $('preview-filename')
 const prevLangLabel = $('preview-lang-label')
 const prevLines     = $('preview-lines')
 const prevTheme     = $('preview-theme-label')
+const presetsRow    = $('presets-row')
 
 // ── Init ──────────────────────────────────────────────────────
 async function init() {
@@ -104,7 +116,45 @@ async function init() {
   } catch { /* non-fatal */ }
 
   renderThemeList()
+  loadPresets()
+  renderPresets()
   bindEvents()
+}
+
+// ── Indent guides: inject absolutely-positioned spans at start of each line.
+//    Each span uses top:0;bottom:0 so it fills the entire .line height,
+//    making consecutive lines' guides form one continuous vertical rule.
+function addIndentGuides(html, indentSize) {
+  return html.replace(
+    /(<span class="line"[^>]*>)(<span[^>]*>)?([ \t]+)/g,
+    (_m, lineOpen, tokenOpen = '', ws) => {
+      const expanded = ws.replace(/\t/g, ' '.repeat(indentSize))
+      const levels = Math.floor(expanded.length / indentSize)
+      if (levels === 0) return _m
+      let guides = ''
+      for (let i = 0; i < levels; i++) {
+        guides += `<span class="indent-guide" style="left:calc(var(--ig-offset,0px) + ${i * indentSize}ch)"></span>`
+      }
+      return lineOpen + guides + (tokenOpen || '') + ws
+    }
+  )
+}
+
+// ── Render preview from cached raw HTML (applies indent guides + truncation note) ──
+function renderPreview() {
+  if (!state.rawHtml) return
+  // Strip whitespace (newlines) between .line spans — inside <pre> they'd be
+  // rendered as visible line breaks, doubling the vertical spacing.
+  let html = state.rawHtml.replace(/<\/span>\s+<span class="line"/g, '</span><span class="line"')
+  if (state.indentGuides) html = addIndentGuides(html, state.indentSize)
+  previewCode.innerHTML = html
+  if (state.lineCount > 120) {
+    const note = document.createElement('div')
+    note.className = 'preview-truncated'
+    note.textContent = `预览显示前 120 行，完整 ${state.lineCount.toLocaleString()} 行将包含在 PDF 中`
+    previewCode.appendChild(note)
+  }
+  applyPreviewCss()
 }
 
 // ── Render theme list ─────────────────────────────────────────
@@ -225,22 +275,15 @@ async function fetchPreview() {
     if (!res.ok) throw new Error((await res.json()).error)
     const { html, bg } = await res.json()
     state.previewBg = bg
-
-    previewCode.innerHTML = html
-    if (state.lineCount > 120) {
-      const note = document.createElement('div')
-      note.className = 'preview-truncated'
-      note.textContent = `预览显示前 120 行，完整 ${state.lineCount.toLocaleString()} 行将包含在 PDF 中`
-      previewCode.appendChild(note)
-    }
+    state.rawHtml = html
 
     previewPanel.style.background = bg
     prevTheme.textContent = state.selectedTheme === '__custom__'
       ? (state.customThemeLabel || 'Custom')
       : (state.themes[state.selectedTheme]?.label || state.selectedTheme)
 
-    // Apply CSS-only settings + page-break indicators after re-inject
-    applyPreviewCss()   // also calls insertPageBreaks()
+    // Render (applies indent guides if on) + CSS settings + page-break indicators
+    renderPreview()
   } catch (err) {
     toast('error', `预览失败：${err.message}`)
   } finally {
@@ -257,7 +300,17 @@ function applyPreviewCss() {
   s.setProperty('--pv-white-space', state.wrapLines ? 'pre-wrap' : 'pre')
   s.setProperty('--pv-word-break',  state.wrapLines ? 'break-all' : 'normal')
   previewCode.classList.toggle('ln', state.lineNumbers)
-  previewCode.classList.toggle('ig', state.indentGuides)
+
+  // Set <pre> max-width to match PDF content width so line wrapping matches
+  // the exported PDF, enabling accurate page-break prediction.
+  const key = state.pageSize || 'a4'
+  const pageWidthMm = state.landscape ? (PAGE_H[key] || 297) : (PAGE_W[key] || 210)
+  const scale = state.scale || 1
+  // PDF margins: 12mm left + 12mm right
+  const pdfContentWidthPx = ((pageWidthMm - 12 - 12) / 25.4 * 96) / scale
+  const pre = previewCode.querySelector('pre')
+  if (pre) pre.style.maxWidth = pdfContentWidthPx + 'px'
+
   insertPageBreaks()
 }
 
@@ -271,18 +324,20 @@ const PDF_MARGIN_L   = 12
 const PDF_MARGIN_R   = 12
 
 /**
- * Build an offscreen replica of the PDF-rendered page layout (same font size,
- * same content width, same pre padding, same wrap behavior) and measure each
- * .line element's Y position. Insert page-break markers in the live preview
- * whenever a line would overflow the current page's remaining height.
+ * Pure math page-break calculation.
  *
- * Accuracy notes:
- *  - Uses real wrapped-height measurement — long wrapped lines take more room.
- *  - Correctly accounts for puppeteer's `scale` (CSS viewport = paper/scale).
- *  - Models the file-header bar on page 1 via a sized spacer in the sandbox.
- *  - Simulates CSS `break-inside: avoid` by resetting the page origin to the
- *    overflowing line's own top — so pages 2..N account for any lines that
- *    effectively got bumped forward.
+ * Formula:
+ *   lineH       = fontSize × lineHeight                (px per code line)
+ *   contentH    = ((pageMm − marginTop − marginBot) / 25.4 × 96) / scale
+ *   headerH     = 8 + 8 + max(fontSize−1, 9) × lineHeight + 1   (file-header bar)
+ *   prePadTop   = 14                                   (pre top padding, page 1 only)
+ *   (prePadBot only affects the last page fragment, not subtracted here)
+ *
+ *   page1Cap    = contentH − headerH − prePadTop       (lines capacity page 1)
+ *   pageNCap    = contentH                              (lines capacity page 2+)
+ *
+ * Insert a page-break marker whenever cumulated line heights exceed the
+ * current page's capacity.
  */
 function insertPageBreaks() {
   previewCode.querySelectorAll('.page-break').forEach(el => el.remove())
@@ -290,100 +345,53 @@ function insertPageBreaks() {
   const liveLines = [...previewCode.querySelectorAll('.line')]
   if (!liveLines.length) return
 
-  const livePre = previewCode.querySelector('pre')
-  if (!livePre) return
-
   const key = state.pageSize || 'a4'
   const pageHeightMm = state.landscape ? (PAGE_W[key] || 210) : (PAGE_H[key] || 297)
-  const pageWidthMm  = state.landscape ? (PAGE_H[key] || 297) : (PAGE_W[key] || 210)
   const scale = state.scale || 1
 
-  // Puppeteer's `scale` works as if the CSS viewport is (paper / scale):
-  // at scale=0.5 the CSS page is 2× as tall, so twice as many lines fit.
-  const contentWidthPx  = ((pageWidthMm  - PDF_MARGIN_L   - PDF_MARGIN_R)   / 25.4 * 96) / scale
-  const contentHeightPx = ((pageHeightMm - PDF_MARGIN_TOP - PDF_MARGIN_BOT) / 25.4 * 96) / scale
-  if (contentHeightPx <= 0 || !isFinite(contentHeightPx)) return
+  // PDF content area height in CSS px (puppeteer scale: viewport = paper / scale)
+  const contentH = ((pageHeightMm - PDF_MARGIN_TOP - PDF_MARGIN_BOT) / 25.4 * 96) / scale
+  if (contentH <= 0 || !isFinite(contentH)) return
 
-  // Estimate file-header bar CSS height (must match template.js layout):
-  //   padding 8px top + 8px bottom + text line + 1px border
-  //   text line height ≈ max(fontSize-1, 9) * lineHeight
+  // Fallback single line height (used if DOM measurement unavailable)
+  const lineH = state.fontSize * parseFloat(state.lineHeight)
+
+  // File-header bar on page 1: padding 8+8, text line, 1px border
   const headerFontSize = Math.max(state.fontSize - 1, 9)
-  const headerHeightPx = 8 + 8 + headerFontSize * parseFloat(state.lineHeight) + 1
+  const headerH = 8 + 8 + headerFontSize * parseFloat(state.lineHeight) + 1
 
-  // Build the sandbox
-  const sandbox = document.createElement('div')
-  sandbox.setAttribute('aria-hidden', 'true')
-  sandbox.style.cssText = `
-    position: fixed;
-    left: -99999px;
-    top: 0;
-    width: ${contentWidthPx}px;
-    box-sizing: border-box;
-    font-family: 'Menlo','Monaco','Cascadia Code','Consolas',monospace;
-    font-size: ${state.fontSize}px;
-    line-height: ${state.lineHeight};
-    visibility: hidden;
-    pointer-events: none;
-  `
+  // Pre padding: 14px top (page 1 only). Bottom padding only affects the
+  // very last page fragment in print CSS, so it's not subtracted here.
+  const prePadTop = 14
 
-  // Page-1 header spacer (lines[0]'s Y position will include this)
-  const headerSpacer = document.createElement('div')
-  headerSpacer.style.cssText = `height: ${headerHeightPx}px; width: 100%;`
-  sandbox.appendChild(headerSpacer)
+  // Page 1: header + pre top padding; page 2+: full content height
+  const page1Cap = contentH - headerH - prePadTop
+  const pageNCap = contentH
 
-  // Replica <pre> with the same padding / wrap / tab rules the PDF uses
-  const pre = document.createElement('pre')
-  pre.style.cssText = `
-    margin: 0;
-    padding: ${state.lineNumbers ? '14px 14px 14px 0' : '14px'};
-    white-space: ${state.wrapLines ? 'pre-wrap' : 'pre'};
-    word-break: ${state.wrapLines ? 'break-all' : 'normal'};
-    overflow: visible;
-    font-family: inherit;
-    font-size: inherit;
-    line-height: inherit;
-    tab-size: ${state.indentSize};
-  `
-  const code = document.createElement('code')
-  code.style.cssText = 'display: block; font-family: inherit; font-size: inherit;'
-
-  // Clone each .line; when line numbers are on, apply the same left padding
-  // the PDF uses (lineNumWidth=42 + 16 = 58).
-  const lineNumLeftPad = state.lineNumbers ? '58px' : '0'
-  const clonedLines = liveLines.map(l => {
-    const clone = l.cloneNode(true)
-    clone.style.display = 'block'
-    clone.style.minHeight = state.lineHeight + 'em'
-    clone.style.paddingLeft = lineNumLeftPad
-    code.appendChild(clone)
-    return clone
+  // Measure actual rendered height of each line (accounts for wrapping)
+  // Use getBoundingClientRect for accurate sub-pixel height.
+  const lineHeights = liveLines.map(el => {
+    const rect = el.getBoundingClientRect()
+    return rect.height > 0 ? rect.height : lineH
   })
-  pre.appendChild(code)
-  sandbox.appendChild(pre)
-  document.body.appendChild(sandbox)
 
-  // Measure — all numbers are in sandbox-local Y space (px from sandbox top)
-  const sandboxTop = sandbox.getBoundingClientRect().top
-  let pageStartY = 0
+  let usedH = 0
   let pageNum = 1
 
-  for (let i = 0; i < clonedLines.length; i++) {
-    const rect = clonedLines[i].getBoundingClientRect()
-    const top = rect.top - sandboxTop
-    const bottom = rect.bottom - sandboxTop
+  for (let i = 0; i < liveLines.length; i++) {
+    const cap = pageNum === 1 ? page1Cap : pageNCap
+    const h = lineHeights[i]
 
-    if (bottom - pageStartY > contentHeightPx && i > 0) {
+    if (usedH + h > cap && i > 0) {
       pageNum++
       const marker = document.createElement('span')
       marker.className = 'page-break'
       marker.dataset.label = `第 ${pageNum} 页`
       liveLines[i].parentNode.insertBefore(marker, liveLines[i])
-      // New page starts where this line actually begins (simulates break-inside: avoid)
-      pageStartY = top
+      usedH = 0
     }
+    usedH += h
   }
-
-  sandbox.remove()
 }
 
 // ── Export ────────────────────────────────────────────────────
@@ -420,6 +428,75 @@ async function exportPdf() {
     exportBtn.classList.remove('loading')
     exportLabel.textContent = '导出 PDF'
   }
+}
+
+// ── Presets ───────────────────────────────────────────────────
+function loadPresets() {
+  try {
+    const raw = localStorage.getItem(PRESETS_LS_KEY)
+    if (!raw) return
+    const arr = JSON.parse(raw)
+    if (Array.isArray(arr) && arr.length === 3) state.presets = arr
+  } catch { /* ignore */ }
+}
+
+function savePresets() {
+  try { localStorage.setItem(PRESETS_LS_KEY, JSON.stringify(state.presets)) } catch { /* ignore */ }
+}
+
+function renderPresets() {
+  const slots = presetsRow.querySelectorAll('.preset-slot')
+  slots.forEach((slot, i) => {
+    const p = state.presets[i]
+    const label = slot.querySelector('.preset-slot-label')
+    if (p) {
+      slot.classList.add('filled')
+      // Short label: theme + fontsize
+      const themeLabel = p.selectedTheme === '__custom__'
+        ? (p.customThemeLabel || 'Custom')
+        : (state.themes[p.selectedTheme]?.label || p.selectedTheme)
+      label.textContent = `${themeLabel} · ${p.fontSize}px`
+      slot.title = `点击应用预设 ${i + 1}`
+    } else {
+      slot.classList.remove('filled')
+      label.textContent = '空'
+      slot.title = '点击保存当前设置为预设'
+    }
+  })
+}
+
+function capturePreset() {
+  const p = {}
+  for (const k of PRESET_KEYS) p[k] = state[k]
+  return p
+}
+
+function applyPreset(p) {
+  for (const k of PRESET_KEYS) if (p[k] !== undefined) state[k] = p[k]
+
+  // Sync UI controls
+  fontSizeRange.value = state.fontSize
+  fontSizeVal.textContent = state.fontSize
+  lineHeightRange.value = state.lineHeight
+  lineHeightVal.textContent = state.lineHeight
+  lineNumbers.checked = state.lineNumbers
+  wrapLines.checked = state.wrapLines
+  indentGuides.checked = state.indentGuides
+  scaleRange.value = state.scale
+  scaleVal.textContent = state.scale.toFixed(2).replace(/\.?0+$/, '') + '×'
+
+  const setSeg = (id, val) => {
+    const g = $(id)
+    if (!g) return
+    g.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b.dataset.value == val))
+  }
+  setSeg('indent-seg', state.indentSize)
+  setSeg('page-seg', state.pageSize)
+  setSeg('orient-seg', state.landscape ? 'landscape' : 'portrait')
+
+  // Custom theme: only re-select if it's '__custom__' and json is present
+  renderThemeList(themeSearch.value)
+  schedulePreview(0)
 }
 
 // ── UI mode toggle ────────────────────────────────────────────
@@ -499,19 +576,50 @@ function bindEvents() {
   })
   wrapLines.addEventListener('change', () => { state.wrapLines = wrapLines.checked; applyPreviewCss() })
   lineNumbers.addEventListener('change', () => { state.lineNumbers = lineNumbers.checked; applyPreviewCss() })
-  indentGuides.addEventListener('change', () => { state.indentGuides = indentGuides.checked; applyPreviewCss() })
+  indentGuides.addEventListener('change', () => { state.indentGuides = indentGuides.checked; renderPreview() })
   scaleRange.addEventListener('input', () => {
     state.scale = parseFloat(scaleRange.value)
     const d = state.scale.toFixed(2).replace(/\.?0+$/, '')
     scaleVal.textContent = d + '×'
   })
 
-  // Indent — CSS only
-  initSegGroup('indent-seg', val => { state.indentSize = parseInt(val); applyPreviewCss() })
+  // Indent — CSS only (but re-render when indent guides are on, because the
+  // injected <span class="indent-guide"> widths are tied to indentSize)
+  initSegGroup('indent-seg', val => {
+    state.indentSize = parseInt(val)
+    if (state.indentGuides) renderPreview()
+    else applyPreviewCss()
+  })
 
   // Page size + orientation — update page-break indicators in preview
   initSegGroup('page-seg',   val => { state.pageSize  = val;                      insertPageBreaks() })
   initSegGroup('orient-seg', val => { state.landscape = val === 'landscape';      insertPageBreaks() })
+
+  // Presets — click slot: apply if filled, save if empty; × clears
+  presetsRow.addEventListener('click', e => {
+    const clearBtn = e.target.closest('.preset-slot-clear')
+    if (clearBtn) {
+      e.stopPropagation()
+      const i = parseInt(clearBtn.dataset.clear)
+      state.presets[i] = null
+      savePresets()
+      renderPresets()
+      toast('success', `预设 ${i + 1} 已清除`)
+      return
+    }
+    const slot = e.target.closest('.preset-slot')
+    if (!slot) return
+    const i = parseInt(slot.dataset.idx)
+    if (state.presets[i]) {
+      applyPreset(state.presets[i])
+      toast('success', `已应用预设 ${i + 1}`)
+    } else {
+      state.presets[i] = capturePreset()
+      savePresets()
+      renderPresets()
+      toast('success', `已保存预设 ${i + 1}`)
+    }
+  })
 
   // Export
   exportBtn.addEventListener('click', exportPdf)
