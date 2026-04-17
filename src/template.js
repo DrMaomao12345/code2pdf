@@ -171,6 +171,15 @@ export function buildHtml({
     }).join('')
   }
 
+  // When fullPageBg: use @page margin:0 + body padding so body background
+  // fills the entire page (Chromium ignores @page{background} and html/body
+  // backgrounds only paint the content box, not the margin area).
+  // Page numbers are rendered via position:fixed instead of @page margin boxes.
+  const pTop    = marginV + 2
+  const pRight  = marginH
+  const pBottom = marginV + 4
+  const pLeft   = marginH
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -180,20 +189,8 @@ export function buildHtml({
   <style>
     @page {
       size: ${pageSize};
-      margin: ${marginV + 2}mm ${marginH}mm ${marginV + 4}mm ${marginH}mm;
+      margin: ${fullPageBg ? 0 : `${pTop}mm ${pRight}mm ${pBottom}mm ${pLeft}mm`};
     }
-
-    ${fullPageBg ? `
-    /* Extend background color into page margins via fixed pseudo-element */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: -200mm;
-      background: ${bg};
-      z-index: -1;
-      print-color-adjust: exact;
-      -webkit-print-color-adjust: exact;
-    }` : ''}
 
     * {
       box-sizing: border-box;
@@ -204,6 +201,8 @@ export function buildHtml({
     html, body {
       background: ${bg};
       width: 100%;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
 
     body {
@@ -213,6 +212,7 @@ export function buildHtml({
       line-height: ${lineHeight};
       color: ${fg};
       background: ${bg};
+      ${fullPageBg ? `padding: ${pTop}mm ${pRight}mm ${pBottom}mm ${pLeft}mm;` : ''}
     }
 
     /* ── File header bar ──────────────────────────────────── */
@@ -336,7 +336,23 @@ export function buildHtml({
       font-family: inherit;
     }` : ''}
 
-    /* ── Page footer with page numbers ───────────────────── */
+    /* ── Page footer ─────────────────────────────────────── */
+    ${fullPageBg ? `
+    /* position:fixed repeats on every page in print mode */
+    .pdf-footer {
+      position: fixed;
+      bottom: ${marginV}mm;
+      left:   ${marginH}mm;
+      right:  ${marginH}mm;
+      display: flex;
+      justify-content: space-between;
+      font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+      font-size: 8px;
+      color: ${lineNumColor};
+    }
+    .pdf-footer-page::after  { content: counter(page) " / " counter(pages); }
+    .pdf-footer-name::after  { content: "${displayName}"; }
+    ` : `
     @page {
       @bottom-right {
         content: counter(page) " / " counter(pages);
@@ -352,10 +368,11 @@ export function buildHtml({
         color: ${lineNumColor};
         padding-top: 4mm;
       }
-    }
+    }`}
   </style>
 </head>
 <body>
+  ${fullPageBg ? `<div class="pdf-footer"><span class="pdf-footer-name"></span><span class="pdf-footer-page"></span></div>` : ''}
   <div class="file-header">
     <div class="file-dot"></div>
     <span class="file-name">${displayName}</span>
