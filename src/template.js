@@ -116,22 +116,56 @@ export function buildHtml({
   // no gap, consecutive lines' guides form one perfectly continuous vertical rule.
   const igOffset = lineNumbers ? `${lineNumPadL}px` : '0px'
   if (indentGuides) {
-    processedHtml = processedHtml.replace(
-      /(<span class="line"[^>]*>)(<span[^>]*>)?([ \t]+)/g,
-      (_m, lineOpen, tokenOpen = '', ws) => {
-        const expanded = ws.replace(/\t/g, ' '.repeat(indentSize))
-        const levels = Math.floor(expanded.length / indentSize)
-        if (levels === 0) return _m
-        let guides = ''
-        for (let i = 0; i < levels; i++) {
-          const left = igOffset === '0px'
-            ? `${i * indentSize}ch`
-            : `calc(${igOffset} + ${i * indentSize}ch)`
-          guides += `<span class="indent-guide" style="left:${left}"></span>`
-        }
-        return lineOpen + guides + (tokenOpen || '') + ws
+    const makeGuides = (level) => {
+      let g = ''
+      for (let i = 0; i < level; i++) {
+        const left = igOffset === '0px'
+          ? `${i * indentSize}ch`
+          : `calc(${igOffset} + ${i * indentSize}ch)`
+        g += `<span class="indent-guide" style="left:${left}"></span>`
       }
-    )
+      return g
+    }
+
+    let prevLevel = 0
+
+    // Split at each line-span so we can process blank lines with context
+    const parts = processedHtml.split(/(?=<span class="line)/)
+    processedHtml = parts.map(part => {
+      if (!part.startsWith('<span class="line')) return part
+
+      const firstGt   = part.indexOf('>')
+      const lastClose = part.lastIndexOf('</span>')
+      if (firstGt === -1 || lastClose === -1) return part
+
+      const open    = part.slice(0, firstGt + 1)
+      const content = part.slice(firstGt + 1, lastClose)
+      const after   = part.slice(lastClose)
+
+      // Strip tags to get raw text and check leading whitespace
+      const raw      = content.replace(/<[^>]+>/g, '')
+      const wsMatch  = raw.match(/^([ \t]+)/)
+
+      if (wsMatch) {
+        const expanded = wsMatch[1].replace(/\t/g, ' '.repeat(indentSize))
+        const level    = Math.floor(expanded.length / indentSize)
+        if (level > 0) {
+          prevLevel = level
+          return open + makeGuides(level) + content + after
+        }
+        prevLevel = 0
+        return part
+      }
+
+      // Blank line — carry guides from previous indented line
+      if (!raw.trim() && prevLevel > 0) {
+        return open + makeGuides(prevLevel) + content + after
+      }
+
+      // Non-indented, non-blank line
+      prevLevel = 0
+      return part
+    }).join('')
   }
 
   return `<!DOCTYPE html>
