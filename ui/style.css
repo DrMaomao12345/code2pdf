@@ -739,6 +739,10 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  display: none;
+}
+.pdf-wrap.visible {
+  display: block;
 }
 #pdf-object {
   width: 100%;

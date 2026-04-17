@@ -90,6 +90,7 @@ const prevLangLabel = $('preview-lang-label')
 const prevLines     = $('preview-lines')
 const prevTheme     = $('preview-theme-label')
 const presetsRow    = $('presets-row')
+const pdfWrap       = document.querySelector('.pdf-wrap')
 const pdfObject     = $('pdf-object')
 
 // ── Init ──────────────────────────────────────────────────────
@@ -220,6 +221,7 @@ function clearFile() {
   previewEmpty.classList.remove('hidden')
   previewPanel.style.background = ''
   pdfObject.data = ''
+  pdfWrap.classList.remove('visible')
   if (state.pdfBlobUrl) { URL.revokeObjectURL(state.pdfBlobUrl); state.pdfBlobUrl = null }
 }
 
@@ -256,6 +258,7 @@ async function fetchPdfPreview() {
     state.pdfBlobUrl = URL.createObjectURL(blob)
 
     pdfObject.data = state.pdfBlobUrl
+    pdfWrap.classList.add('visible')
     previewEmpty.classList.add('hidden')
 
     prevTheme.textContent = isCustom
