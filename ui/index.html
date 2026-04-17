@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>code2pdf</title>
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
   <div id="app">
@@ -160,12 +160,21 @@
             </div>
           </div>
 
-          <!-- Margin -->
+          <!-- Horizontal margin -->
           <div class="opt-row">
-            <span class="opt-label">边距</span>
+            <span class="opt-label">横边距</span>
             <div class="opt-right">
-              <input type="range" id="margin" min="0" max="30" value="12" step="1">
-              <span class="range-val" id="margin-val">12mm</span>
+              <input type="range" id="margin-h" min="0" max="30" value="12" step="1">
+              <span class="range-val" id="margin-h-val">12mm</span>
+            </div>
+          </div>
+
+          <!-- Vertical margin -->
+          <div class="opt-row">
+            <span class="opt-label">纵边距</span>
+            <div class="opt-right">
+              <input type="range" id="margin-v" min="0" max="30" value="12" step="1">
+              <span class="range-val" id="margin-v-val">12mm</span>
             </div>
           </div>
 
@@ -258,6 +267,6 @@
   </div>
 
   <div id="toasts"></div>
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

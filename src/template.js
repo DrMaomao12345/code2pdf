@@ -69,7 +69,8 @@ export function buildHtml({
   wrapLines = true,
   indentGuides = false,
   pageSize = 'A4',
-  margin = 12,
+  marginH = 12,
+  marginV = 12,
   fullPageBg = false,
 }) {
   const dark = isDark(bg)
@@ -179,9 +180,20 @@ export function buildHtml({
   <style>
     @page {
       size: ${pageSize};
-      margin: ${margin + 2}mm ${margin}mm ${margin + 4}mm ${margin}mm;
-      ${fullPageBg ? `background: ${bg};` : ''}
+      margin: ${marginV + 2}mm ${marginH}mm ${marginV + 4}mm ${marginH}mm;
     }
+
+    ${fullPageBg ? `
+    /* Extend background color into page margins via fixed pseudo-element */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: -200mm;
+      background: ${bg};
+      z-index: -1;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }` : ''}
 
     * {
       box-sizing: border-box;
