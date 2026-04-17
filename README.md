@@ -24,15 +24,33 @@ Export source code to beautiful PDF files with VSCode-compatible syntax highligh
 
 ## 安装 / Install
 
-```bash
-# 全局安装（推荐）
-npm install -g code2pdf
+### 从源码安装（推荐）
 
-# 或在项目中安装
-npm install code2pdf
+```bash
+git clone https://github.com/DrMaomao12345/code2pdf.git
+cd code2pdf
+npm install
 ```
 
 > 首次安装会自动下载 Chromium（约 120MB），用于 PDF 渲染。
+
+### 全局安装
+
+```bash
+npm install -g code2pdf
+```
+
+### 使用 Claude Code 一键搭建
+
+如果你使用 [Claude Code](https://claude.ai/code)，可以直接复制以下提示词让 AI 帮你完成安装和配置：
+
+```
+帮我克隆并安装 code2pdf 项目：
+1. git clone https://github.com/DrMaomao12345/code2pdf.git
+2. cd code2pdf && npm install
+3. 运行 npm run ui 启动 Web 界面
+4. 在浏览器中打开 http://localhost:3131
+```
 
 ---
 
@@ -251,6 +269,278 @@ npm run ui
 ---
 
 ## 开发 / Development
+
+```bash
+git clone https://github.com/DrMaomao12345/code2pdf
+cd code2pdf
+npm install
+
+# CLI
+node bin/code2pdf.js src/index.js --line-numbers
+
+# Web UI
+npm run ui
+```
+
+---
+
+## License
+
+MIT
+
+---
+
+---
+
+# code2pdf (English)
+
+Export source code to beautiful PDF files with VSCode-compatible syntax highlighting.
+
+---
+
+## Features
+
+- **Full VSCode theme compatibility** — Uses the same [shiki](https://shiki.style) highlighting engine as VSCode (TextMate grammars + VSCode theme JSON)
+- **50+ built-in themes** — One Dark Pro, Dracula, Tokyo Night, GitHub, Catppuccin, and more
+- **Custom themes** — Import any VSCode `.json` theme file directly
+- **100+ programming languages** — Automatic language detection with manual override
+- **Local Web UI** — Run `npm run ui` for a browser-based visual interface with drag-and-drop, live preview, and page break indicators
+- **Fine-grained typography** — Font size, line height, indent size, indent guides, line numbers, word wrap
+- **VSCode-style indent guides** — Continuous vertical lines marking indent levels, consistent between preview and PDF export
+- **Multiple page sizes** — A4, Letter, A3, Legal + portrait/landscape + content scaling
+- **Preset memory** — 3 preset slots in Web UI to save/load favorite setting combinations (persisted to localStorage)
+- **Accurate page break preview** — Real-time page break indicators in preview, with wrapped-line height measurement
+- **CLI + Node.js API** — Command-line tool + programmatic interface
+
+---
+
+## Install
+
+### From source (recommended)
+
+```bash
+git clone https://github.com/DrMaomao12345/code2pdf.git
+cd code2pdf
+npm install
+```
+
+> Chromium (~120MB) will be downloaded automatically on first install for PDF rendering.
+
+### Global install
+
+```bash
+npm install -g code2pdf
+```
+
+### One-click setup with Claude Code
+
+If you use [Claude Code](https://claude.ai/code), paste this prompt to set up automatically:
+
+```
+Clone and set up the code2pdf project:
+1. git clone https://github.com/DrMaomao12345/code2pdf.git
+2. cd code2pdf && npm install
+3. Run npm run ui to start the Web UI
+4. Open http://localhost:3131 in the browser
+```
+
+---
+
+## Quick Start
+
+```bash
+# Basic: convert main.py to main.pdf
+code2pdf main.py
+
+# Specify output path
+code2pdf main.py -o output/docs/main.pdf
+
+# Use a specific theme
+code2pdf main.py -t dracula
+
+# Show line numbers, adjust font size
+code2pdf main.py --line-numbers --font-size 11
+
+# Show indent guides (great for nested code)
+code2pdf main.py --indent-guides
+
+# Use your own VSCode theme JSON file
+code2pdf main.py -t ~/themes/my-custom-theme.json
+
+# Landscape orientation (good for wide code)
+code2pdf main.py --landscape
+
+# Letter paper, no word wrap
+code2pdf main.py --page-size letter --no-wrap
+```
+
+---
+
+## Theme Configuration
+
+### Built-in themes
+
+```bash
+# List all available themes
+code2pdf --list-themes
+
+# Use GitHub Light (great for printing)
+code2pdf index.ts -t github-light
+
+# Use One Dark Pro (default)
+code2pdf index.ts -t one-dark-pro
+```
+
+### Built-in theme list (partial)
+
+| Theme ID | Name | Type |
+|---|---|---|
+| `one-dark-pro` | One Dark Pro | Dark |
+| `github-dark` | GitHub Dark | Dark |
+| `github-light` | GitHub Light | Light |
+| `dracula` | Dracula | Dark |
+| `tokyo-night` | Tokyo Night | Dark |
+| `monokai` | Monokai | Dark |
+| `nord` | Nord | Dark |
+| `solarized-dark` | Solarized Dark | Dark |
+| `solarized-light` | Solarized Light | Light |
+| `catppuccin-mocha` | Catppuccin Mocha | Dark |
+| `catppuccin-latte` | Catppuccin Latte | Light |
+| `rose-pine` | Rosé Pine | Dark |
+| `synthwave-84` | SynthWave '84 | Dark |
+| `dark-plus` | Dark+ (VS Code default) | Dark |
+| `one-light` | One Light | Light |
+
+Run `code2pdf --list-themes` to see all 50+ themes.
+
+### Custom VSCode themes
+
+1. Download or export a `.json` theme file from the VSCode marketplace
+2. The theme file must follow the [VSCode Color Theme](https://code.visualstudio.com/api/extension-guides/color-theme) specification (containing `colors` and/or `tokenColors` fields)
+
+```bash
+code2pdf app.go -t /path/to/my-theme.json
+```
+
+---
+
+## CLI Options
+
+```
+Usage: code2pdf [options] <file>
+
+Arguments:
+  file                    Source code file to convert
+
+Options:
+  -v, --version           Show version number
+  -o, --output <path>     Output PDF file path (default: <input>.pdf)
+  -t, --theme <name|path> Theme name or path to VSCode theme JSON
+                          (default: "one-dark-pro")
+  -l, --language <lang>   Override language detection
+  -s, --font-size <n>     Font size in px (default: 12)
+  -n, --line-numbers      Show line numbers (default: false)
+  --indent-guides         Draw vertical indent guide lines (default: false)
+  --no-wrap               Disable line wrapping
+  -p, --page-size <size>  Page size: a4, letter, a3, legal, a5, tabloid
+                          (default: "a4")
+  --landscape             Landscape orientation (default: false)
+  --scale <n>             Content scale factor 0.1–2.0 (default: 1.0)
+  --list-themes           List all built-in themes and exit
+  --list-languages        List all supported languages and exit
+  -h, --help              Show help
+```
+
+---
+
+## Node.js API
+
+```javascript
+import { convertToPdf, convertCodeToPdf } from 'code2pdf'
+
+// Convert from file
+await convertToPdf({
+  input: 'src/index.ts',
+  output: 'docs/index.pdf',
+  theme: 'tokyo-night',
+  fontSize: 12,
+  lineNumbers: true,
+  pageSize: 'a4',
+})
+
+// Convert from string
+await convertCodeToPdf({
+  code: 'const hello = "world"',
+  language: 'javascript',
+  filename: 'hello.js',
+  output: 'hello.pdf',
+  theme: 'github-light',
+})
+```
+
+### API Reference
+
+```typescript
+convertToPdf(options: {
+  input: string          // Input file path
+  output: string         // Output PDF path
+  language?: string      // Language ID (auto-detected if omitted)
+  theme?: string         // Theme name or path to VSCode theme JSON
+  fontSize?: number      // Font size in px (default: 12)
+  lineNumbers?: boolean  // Show line numbers (default: false)
+  wrapLines?: boolean    // Word wrap (default: true)
+  indentGuides?: boolean // Indent guides (default: false)
+  pageSize?: string      // Page size (default: 'a4')
+  landscape?: boolean    // Landscape orientation (default: false)
+  scale?: number         // Content scale (default: 1.0)
+}): Promise<void>
+```
+
+---
+
+## Supported Languages
+
+```bash
+code2pdf --list-languages
+```
+
+Supports 100+ languages including: JavaScript/TypeScript, Python, Rust, Go, Java, C/C++, C#, PHP, Ruby, Swift, Kotlin, Dart, SQL, Shell, HTML/CSS, Markdown, and more.
+
+---
+
+## Web UI
+
+In addition to the CLI, the project includes a local web interface for drag-and-drop file upload, theme browsing, live preview, and accurate page break indicators:
+
+```bash
+npm run ui
+```
+
+Opens `http://localhost:3131` automatically.
+
+Features:
+
+- Drag-and-drop or click to upload any source code file
+- Search 50+ themes in the sidebar, import custom VSCode `.json` themes
+- Font size, line height, indent, line numbers, word wrap, indent guides — all update instantly
+- **VSCode-style indent guides** — continuous vertical lines, consistent between preview and PDF
+- Page size / orientation / content scaling with **accurate page break indicators** in preview
+- **3 preset slots** — save and load favorite setting combinations (persisted to localStorage)
+- Light / dark UI theme toggle
+
+---
+
+## Tech Stack
+
+| Component | Role |
+|---|---|
+| [shiki](https://shiki.style) | Same syntax highlighting engine as VSCode |
+| [puppeteer](https://pptr.dev) | Headless Chromium for PDF rendering |
+| [commander](https://github.com/tj/commander.js) | CLI argument parsing |
+
+---
+
+## Development
 
 ```bash
 git clone https://github.com/DrMaomao12345/code2pdf
