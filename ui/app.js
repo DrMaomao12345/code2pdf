@@ -44,6 +44,9 @@ const state = {
   uiMode: 'light',
   rawHtml: '',
   presets: [null, null, null],
+  pdfDebounce: null,
+  pdfBlobUrl: null,
+  pdfGenerating: false,
 }
 
 // ── Preset settings keys (what we store/apply) ────────────────
@@ -90,6 +93,11 @@ const prevLangLabel = $('preview-lang-label')
 const prevLines     = $('preview-lines')
 const prevTheme     = $('preview-theme-label')
 const presetsRow    = $('presets-row')
+const pdfPanel      = $('pdf-panel')
+const pdfPanelEmpty = $('pdf-panel-empty')
+const pdfPanelLoad  = $('pdf-panel-loading')
+const pdfPanelStatus= $('pdf-panel-status')
+const pdfObject     = $('pdf-object')
 
 // ── Init ──────────────────────────────────────────────────────
 async function init() {
@@ -203,6 +211,7 @@ function selectTheme(id) {
   state.selectedTheme = id
   renderThemeList(themeSearch.value)
   schedulePreview()
+  schedulePdfPreview()
 }
 
 // ── File load ─────────────────────────────────────────────────
@@ -237,6 +246,7 @@ function loadFile(file) {
     previewEmpty.classList.add('hidden')
 
     schedulePreview(0)
+    schedulePdfPreview(1000)
   }
   reader.readAsText(file)
 }
@@ -252,6 +262,9 @@ function clearFile() {
   previewEmpty.classList.remove('hidden')
   previewCode.innerHTML = ''
   previewPanel.style.background = ''
+  pdfObject.data = ''
+  pdfPanelEmpty.classList.remove('hidden')
+  if (state.pdfBlobUrl) { URL.revokeObjectURL(state.pdfBlobUrl); state.pdfBlobUrl = null }
 }
 
 // ── Preview: re-highlight (server call) ───────────────────────
@@ -288,6 +301,52 @@ async function fetchPreview() {
     toast('error', `预览失败：${err.message}`)
   } finally {
     previewLoad.classList.remove('visible')
+  }
+}
+
+// ── PDF Preview: auto-generate and show inline ────────────────
+function schedulePdfPreview(delay = 800) {
+  clearTimeout(state.pdfDebounce)
+  state.pdfDebounce = setTimeout(fetchPdfPreview, delay)
+}
+
+async function fetchPdfPreview() {
+  if (!state.code || state.pdfGenerating) return
+  state.pdfGenerating = true
+  pdfPanelLoad.classList.add('visible')
+  pdfPanelStatus.textContent = '生成中…'
+
+  try {
+    const isCustom = state.selectedTheme === '__custom__'
+    const body = {
+      code: state.code, filename: state.filename || 'code.txt', lang: state.lang || 'text',
+      theme: isCustom ? (state.customThemeJson?.name || 'custom') : state.selectedTheme,
+      customThemeJson: isCustom ? state.customThemeJson : null,
+      fontSize: state.fontSize, lineHeight: state.lineHeight, indentSize: state.indentSize,
+      lineNumbers: state.lineNumbers, wrapLines: state.wrapLines, indentGuides: state.indentGuides,
+      pageSize: state.pageSize, landscape: state.landscape, scale: state.scale,
+    }
+    const res = await fetch('/api/preview-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) throw new Error((await res.json()).error || 'Unknown error')
+
+    const blob = await res.blob()
+    if (state.pdfBlobUrl) URL.revokeObjectURL(state.pdfBlobUrl)
+    state.pdfBlobUrl = URL.createObjectURL(blob)
+
+    pdfObject.data = state.pdfBlobUrl
+    pdfPanelEmpty.classList.add('hidden')
+    pdfPanelStatus.textContent = '已更新'
+    setTimeout(() => { pdfPanelStatus.textContent = '' }, 2000)
+  } catch (err) {
+    pdfPanelStatus.textContent = '生成失败'
+    toast('error', `PDF 预览失败：${err.message}`)
+  } finally {
+    state.pdfGenerating = false
+    pdfPanelLoad.classList.remove('visible')
   }
 }
 
@@ -497,6 +556,7 @@ function applyPreset(p) {
   // Custom theme: only re-select if it's '__custom__' and json is present
   renderThemeList(themeSearch.value)
   schedulePreview(0)
+  schedulePdfPreview(1000)
 }
 
 // ── UI mode toggle ────────────────────────────────────────────
@@ -539,6 +599,7 @@ function bindEvents() {
       state.lang = v
       prevLangLabel.textContent = v
       schedulePreview(0)
+      schedulePdfPreview()
     }
   })
   langOverride.addEventListener('keydown', e => { if (e.key === 'Enter') { langOverride.blur() } })
@@ -558,6 +619,7 @@ function bindEvents() {
       state.selectedTheme = '__custom__'
       renderThemeList(themeSearch.value)
       schedulePreview(0)
+      schedulePdfPreview()
       toast('success', `主题「${state.customThemeLabel}」加载成功`)
     } catch (err) { toast('error', `主题加载失败：${err.message}`) }
     customInput.value = ''
@@ -568,19 +630,22 @@ function bindEvents() {
     state.fontSize = parseInt(fontSizeRange.value)
     fontSizeVal.textContent = state.fontSize
     applyPreviewCss()
+    schedulePdfPreview()
   })
   lineHeightRange.addEventListener('input', () => {
     state.lineHeight = parseFloat(lineHeightRange.value).toFixed(1)
     lineHeightVal.textContent = state.lineHeight
     applyPreviewCss()
+    schedulePdfPreview()
   })
-  wrapLines.addEventListener('change', () => { state.wrapLines = wrapLines.checked; applyPreviewCss() })
-  lineNumbers.addEventListener('change', () => { state.lineNumbers = lineNumbers.checked; applyPreviewCss() })
-  indentGuides.addEventListener('change', () => { state.indentGuides = indentGuides.checked; renderPreview() })
+  wrapLines.addEventListener('change', () => { state.wrapLines = wrapLines.checked; applyPreviewCss(); schedulePdfPreview() })
+  lineNumbers.addEventListener('change', () => { state.lineNumbers = lineNumbers.checked; applyPreviewCss(); schedulePdfPreview() })
+  indentGuides.addEventListener('change', () => { state.indentGuides = indentGuides.checked; renderPreview(); schedulePdfPreview() })
   scaleRange.addEventListener('input', () => {
     state.scale = parseFloat(scaleRange.value)
     const d = state.scale.toFixed(2).replace(/\.?0+$/, '')
     scaleVal.textContent = d + '×'
+    schedulePdfPreview()
   })
 
   // Indent — CSS only (but re-render when indent guides are on, because the
@@ -589,11 +654,12 @@ function bindEvents() {
     state.indentSize = parseInt(val)
     if (state.indentGuides) renderPreview()
     else applyPreviewCss()
+    schedulePdfPreview()
   })
 
   // Page size + orientation — update page-break indicators in preview
-  initSegGroup('page-seg',   val => { state.pageSize  = val;                      insertPageBreaks() })
-  initSegGroup('orient-seg', val => { state.landscape = val === 'landscape';      insertPageBreaks() })
+  initSegGroup('page-seg',   val => { state.pageSize  = val; insertPageBreaks(); schedulePdfPreview() })
+  initSegGroup('orient-seg', val => { state.landscape = val === 'landscape'; insertPageBreaks(); schedulePdfPreview() })
 
   // Presets — click slot: apply if filled, save if empty; × clears
   presetsRow.addEventListener('click', e => {

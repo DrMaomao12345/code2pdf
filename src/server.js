@@ -63,6 +63,45 @@ app.post('/api/preview', async (req, res) => {
 })
 
 /**
+ * Generate PDF and stream it for inline preview (no download headers).
+ */
+app.post('/api/preview-pdf', async (req, res) => {
+  const tmpPath = path.join(os.tmpdir(), `code2pdf-preview-${Date.now()}.pdf`)
+  const cleanup = () => { try { unlinkSync(tmpPath) } catch {} }
+  try {
+    const {
+      code = '', filename = 'code.txt', lang = 'text',
+      theme = 'one-dark-pro', customThemeJson = null,
+      fontSize = 12, lineHeight = 1.6, indentSize = 2,
+      lineNumbers = false, wrapLines = true, indentGuides = false,
+      pageSize = 'a4', landscape = false, scale = 1.0,
+    } = req.body
+
+    const { themeId, customTheme } = customThemeJson
+      ? { themeId: customThemeJson.name || 'custom', customTheme: customThemeJson }
+      : await resolveTheme(theme)
+
+    const { html: codeHtml, bg, fg } = await highlight(code, { lang, themeId, customTheme })
+    const html = buildHtml({
+      codeHtml, filename, language: lang, themeId,
+      bg, fg, fontSize, lineHeight, indentSize,
+      lineNumbers, wrapLines, indentGuides, pageSize,
+    })
+
+    await generatePdf({ html, outputPath: tmpPath, pageSize, landscape, scale })
+
+    res.setHeader('Content-Type', 'application/pdf')
+    const stream = createReadStream(tmpPath)
+    stream.pipe(res)
+    stream.on('end', cleanup)
+    stream.on('error', cleanup)
+  } catch (err) {
+    cleanup()
+    res.status(500).json({ error: err.message })
+  }
+})
+
+/**
  * Generate PDF and stream it back to the browser for download.
  */
 app.post('/api/export', async (req, res) => {

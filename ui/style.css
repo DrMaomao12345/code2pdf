@@ -733,3 +733,66 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 .toast-msg { color: var(--text-1); }
 @keyframes toast-in  { from { opacity:0; transform: translateY(6px) scale(0.97); } to { opacity:1; transform: translateY(0) scale(1); } }
 @keyframes toast-out { from { opacity:1; transform: translateY(0); } to { opacity:0; transform: translateY(4px); } }
+
+/* ── PDF Preview Panel ───────────────────────────────────────── */
+#pdf-panel {
+  width: 380px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  position: relative;
+}
+
+.pdf-panel-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+.pdf-panel-title { font-weight: 600; color: var(--text-1); }
+
+.pdf-panel-status {
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+
+.pdf-panel-empty {
+  position: absolute;
+  inset: 36px 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.pdf-panel-empty.hidden { opacity: 0; }
+
+.pdf-panel-loading {
+  display: none;
+  position: absolute;
+  inset: 36px 0 0;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(2px);
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+.pdf-panel-loading.visible { display: flex; }
+
+#pdf-object {
+  flex: 1;
+  width: 100%;
+  border: none;
+  display: block;
+}
