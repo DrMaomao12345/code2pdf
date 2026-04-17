@@ -230,40 +230,10 @@
         <div class="preview-loading-spinner"></div>
       </div>
 
-      <!-- Code -->
-      <div class="preview-code" id="preview-code"></div>
+      <!-- PDF Preview (replaces code preview) -->
+      <object id="pdf-object" type="application/pdf" title="PDF 预览" class="pdf-object"></object>
 
     </main>
-
-    <!-- ── PDF Preview Panel ──────────────────────────────────── -->
-    <section id="pdf-panel">
-
-      <!-- Bar -->
-      <div class="pdf-panel-bar">
-        <span class="pdf-panel-title">PDF 预览</span>
-        <span class="pdf-panel-status" id="pdf-panel-status"></span>
-      </div>
-
-      <!-- Empty state -->
-      <div class="pdf-panel-empty" id="pdf-panel-empty">
-        <div class="preview-empty-art">
-          <svg width="40" height="40" viewBox="0 0 56 56" fill="none">
-            <rect x="4" y="4" width="48" height="48" rx="10" stroke="currentColor" stroke-width="2" opacity="0.2"/>
-            <path d="M16 20h10M16 28h24M16 36h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.25"/>
-          </svg>
-        </div>
-        <p class="preview-empty-title">选择文件后自动生成</p>
-      </div>
-
-      <!-- Generating overlay -->
-      <div class="pdf-panel-loading" id="pdf-panel-loading">
-        <div class="preview-loading-spinner"></div>
-      </div>
-
-      <!-- PDF object -->
-      <object id="pdf-object" type="application/pdf" title="PDF 预览"></object>
-
-    </section>
 
   </div>
 

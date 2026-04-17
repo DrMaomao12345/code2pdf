@@ -39,10 +39,8 @@ const state = {
   lineNumbers: false, wrapLines: true, indentGuides: false,
   pageSize: 'a4', landscape: false, scale: 1.0,
   previewBg: '#282c34',
-  previewDebounce: null,
   exporting: false,
   uiMode: 'light',
-  rawHtml: '',
   presets: [null, null, null],
   pdfDebounce: null,
   pdfBlobUrl: null,
@@ -87,16 +85,11 @@ const previewPanel  = $('preview-panel')
 const previewBar    = $('preview-bar')
 const previewEmpty  = $('preview-empty')
 const previewLoad   = $('preview-loading')
-const previewCode   = $('preview-code')
 const prevFilename  = $('preview-filename')
 const prevLangLabel = $('preview-lang-label')
 const prevLines     = $('preview-lines')
 const prevTheme     = $('preview-theme-label')
 const presetsRow    = $('presets-row')
-const pdfPanel      = $('pdf-panel')
-const pdfPanelEmpty = $('pdf-panel-empty')
-const pdfPanelLoad  = $('pdf-panel-loading')
-const pdfPanelStatus= $('pdf-panel-status')
 const pdfObject     = $('pdf-object')
 
 // ── Init ──────────────────────────────────────────────────────
@@ -127,42 +120,6 @@ async function init() {
   loadPresets()
   renderPresets()
   bindEvents()
-}
-
-// ── Indent guides: inject absolutely-positioned spans at start of each line.
-//    Each span uses top:0;bottom:0 so it fills the entire .line height,
-//    making consecutive lines' guides form one continuous vertical rule.
-function addIndentGuides(html, indentSize) {
-  return html.replace(
-    /(<span class="line"[^>]*>)(<span[^>]*>)?([ \t]+)/g,
-    (_m, lineOpen, tokenOpen = '', ws) => {
-      const expanded = ws.replace(/\t/g, ' '.repeat(indentSize))
-      const levels = Math.floor(expanded.length / indentSize)
-      if (levels === 0) return _m
-      let guides = ''
-      for (let i = 0; i < levels; i++) {
-        guides += `<span class="indent-guide" style="left:calc(var(--ig-offset,0px) + ${i * indentSize}ch)"></span>`
-      }
-      return lineOpen + guides + (tokenOpen || '') + ws
-    }
-  )
-}
-
-// ── Render preview from cached raw HTML (applies indent guides + truncation note) ──
-function renderPreview() {
-  if (!state.rawHtml) return
-  // Strip whitespace (newlines) between .line spans — inside <pre> they'd be
-  // rendered as visible line breaks, doubling the vertical spacing.
-  let html = state.rawHtml.replace(/<\/span>\s+<span class="line"/g, '</span><span class="line"')
-  if (state.indentGuides) html = addIndentGuides(html, state.indentSize)
-  previewCode.innerHTML = html
-  if (state.lineCount > 120) {
-    const note = document.createElement('div')
-    note.className = 'preview-truncated'
-    note.textContent = `预览显示前 120 行，完整 ${state.lineCount.toLocaleString()} 行将包含在 PDF 中`
-    previewCode.appendChild(note)
-  }
-  applyPreviewCss()
 }
 
 // ── Render theme list ─────────────────────────────────────────
@@ -209,8 +166,10 @@ function initSegGroup(groupId, onChange) {
 // ── Theme selection ───────────────────────────────────────────
 function selectTheme(id) {
   state.selectedTheme = id
+  if (id !== '__custom__') {
+    state.previewBg = THEME_BG[id] || '#1e1e1e'
+  }
   renderThemeList(themeSearch.value)
-  schedulePreview()
   schedulePdfPreview()
 }
 
@@ -245,7 +204,6 @@ function loadFile(file) {
     previewBar.classList.add('visible')
     previewEmpty.classList.add('hidden')
 
-    schedulePreview(0)
     schedulePdfPreview(1000)
   }
   reader.readAsText(file)
@@ -260,48 +218,9 @@ function clearFile() {
   exportBtn.disabled = true
   previewBar.classList.remove('visible')
   previewEmpty.classList.remove('hidden')
-  previewCode.innerHTML = ''
   previewPanel.style.background = ''
   pdfObject.data = ''
-  pdfPanelEmpty.classList.remove('hidden')
   if (state.pdfBlobUrl) { URL.revokeObjectURL(state.pdfBlobUrl); state.pdfBlobUrl = null }
-}
-
-// ── Preview: re-highlight (server call) ───────────────────────
-function schedulePreview(delay = 280) {
-  clearTimeout(state.previewDebounce)
-  state.previewDebounce = setTimeout(fetchPreview, delay)
-}
-
-async function fetchPreview() {
-  if (!state.code) return
-  previewLoad.classList.add('visible')
-  try {
-    const isCustom = state.selectedTheme === '__custom__'
-    const body = {
-      code: state.code,
-      lang: state.lang || 'text',
-      theme: isCustom ? (state.customThemeJson?.name || 'custom') : state.selectedTheme,
-      customThemeJson: isCustom ? state.customThemeJson : null,
-    }
-    const res = await fetch('/api/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    if (!res.ok) throw new Error((await res.json()).error)
-    const { html, bg } = await res.json()
-    state.previewBg = bg
-    state.rawHtml = html
-
-    previewPanel.style.background = bg
-    prevTheme.textContent = state.selectedTheme === '__custom__'
-      ? (state.customThemeLabel || 'Custom')
-      : (state.themes[state.selectedTheme]?.label || state.selectedTheme)
-
-    // Render (applies indent guides if on) + CSS settings + page-break indicators
-    renderPreview()
-  } catch (err) {
-    toast('error', `预览失败：${err.message}`)
-  } finally {
-    previewLoad.classList.remove('visible')
-  }
 }
 
 // ── PDF Preview: auto-generate and show inline ────────────────
@@ -313,8 +232,7 @@ function schedulePdfPreview(delay = 800) {
 async function fetchPdfPreview() {
   if (!state.code || state.pdfGenerating) return
   state.pdfGenerating = true
-  pdfPanelLoad.classList.add('visible')
-  pdfPanelStatus.textContent = '生成中…'
+  previewLoad.classList.add('visible')
 
   try {
     const isCustom = state.selectedTheme === '__custom__'
@@ -338,118 +256,16 @@ async function fetchPdfPreview() {
     state.pdfBlobUrl = URL.createObjectURL(blob)
 
     pdfObject.data = state.pdfBlobUrl
-    pdfPanelEmpty.classList.add('hidden')
-    pdfPanelStatus.textContent = '已更新'
-    setTimeout(() => { pdfPanelStatus.textContent = '' }, 2000)
+    previewEmpty.classList.add('hidden')
+
+    prevTheme.textContent = isCustom
+      ? (state.customThemeLabel || 'Custom')
+      : (state.themes[state.selectedTheme]?.label || state.selectedTheme)
   } catch (err) {
-    pdfPanelStatus.textContent = '生成失败'
     toast('error', `PDF 预览失败：${err.message}`)
   } finally {
     state.pdfGenerating = false
-    pdfPanelLoad.classList.remove('visible')
-  }
-}
-
-// ── Preview: CSS-only instant update (no server call) ─────────
-function applyPreviewCss() {
-  const s = previewPanel.style
-  s.setProperty('--pv-font-size',   state.fontSize + 'px')
-  s.setProperty('--pv-line-height', String(state.lineHeight))
-  s.setProperty('--pv-tab-size',    String(state.indentSize))
-  s.setProperty('--pv-white-space', state.wrapLines ? 'pre-wrap' : 'pre')
-  s.setProperty('--pv-word-break',  state.wrapLines ? 'break-all' : 'normal')
-  previewCode.classList.toggle('ln', state.lineNumbers)
-
-  // Set <pre> max-width to match PDF content width so line wrapping matches
-  // the exported PDF, enabling accurate page-break prediction.
-  const key = state.pageSize || 'a4'
-  const pageWidthMm = state.landscape ? (PAGE_H[key] || 297) : (PAGE_W[key] || 210)
-  const scale = state.scale || 1
-  // PDF margins: 12mm left + 12mm right
-  const pdfContentWidthPx = ((pageWidthMm - 12 - 12) / 25.4 * 96) / scale
-  const pre = previewCode.querySelector('pre')
-  if (pre) pre.style.maxWidth = pdfContentWidthPx + 'px'
-
-  insertPageBreaks()
-}
-
-// ── Page-break indicators ─────────────────────────────────────
-// Page heights/widths in mm (portrait height, portrait width)
-const PAGE_H = { a4: 297, letter: 279.4, a3: 420, legal: 355.6, a5: 210 }
-const PAGE_W = { a4: 210, letter: 215.9, a3: 297, legal: 215.9, a5: 148 }
-const PDF_MARGIN_TOP = 14   // mm — must match template.js @page margin
-const PDF_MARGIN_BOT = 16   // mm
-const PDF_MARGIN_L   = 12
-const PDF_MARGIN_R   = 12
-
-/**
- * Pure math page-break calculation.
- *
- * Formula:
- *   lineH       = fontSize × lineHeight                (px per code line)
- *   contentH    = ((pageMm − marginTop − marginBot) / 25.4 × 96) / scale
- *   headerH     = 8 + 8 + max(fontSize−1, 9) × lineHeight + 1   (file-header bar)
- *   prePadTop   = 14                                   (pre top padding, page 1 only)
- *   (prePadBot only affects the last page fragment, not subtracted here)
- *
- *   page1Cap    = contentH − headerH − prePadTop       (lines capacity page 1)
- *   pageNCap    = contentH                              (lines capacity page 2+)
- *
- * Insert a page-break marker whenever cumulated line heights exceed the
- * current page's capacity.
- */
-function insertPageBreaks() {
-  previewCode.querySelectorAll('.page-break').forEach(el => el.remove())
-
-  const liveLines = [...previewCode.querySelectorAll('.line')]
-  if (!liveLines.length) return
-
-  const key = state.pageSize || 'a4'
-  const pageHeightMm = state.landscape ? (PAGE_W[key] || 210) : (PAGE_H[key] || 297)
-  const scale = state.scale || 1
-
-  // PDF content area height in CSS px (puppeteer scale: viewport = paper / scale)
-  const contentH = ((pageHeightMm - PDF_MARGIN_TOP - PDF_MARGIN_BOT) / 25.4 * 96) / scale
-  if (contentH <= 0 || !isFinite(contentH)) return
-
-  // Fallback single line height (used if DOM measurement unavailable)
-  const lineH = state.fontSize * parseFloat(state.lineHeight)
-
-  // File-header bar on page 1: padding 8+8, text line, 1px border
-  const headerFontSize = Math.max(state.fontSize - 1, 9)
-  const headerH = 8 + 8 + headerFontSize * parseFloat(state.lineHeight) + 1
-
-  // Pre padding: 14px top (page 1 only). Bottom padding only affects the
-  // very last page fragment in print CSS, so it's not subtracted here.
-  const prePadTop = 14
-
-  // Page 1: header + pre top padding; page 2+: full content height
-  const page1Cap = contentH - headerH - prePadTop
-  const pageNCap = contentH
-
-  // Measure actual rendered height of each line (accounts for wrapping)
-  // Use getBoundingClientRect for accurate sub-pixel height.
-  const lineHeights = liveLines.map(el => {
-    const rect = el.getBoundingClientRect()
-    return rect.height > 0 ? rect.height : lineH
-  })
-
-  let usedH = 0
-  let pageNum = 1
-
-  for (let i = 0; i < liveLines.length; i++) {
-    const cap = pageNum === 1 ? page1Cap : pageNCap
-    const h = lineHeights[i]
-
-    if (usedH + h > cap && i > 0) {
-      pageNum++
-      const marker = document.createElement('span')
-      marker.className = 'page-break'
-      marker.dataset.label = `第 ${pageNum} 页`
-      liveLines[i].parentNode.insertBefore(marker, liveLines[i])
-      usedH = 0
-    }
-    usedH += h
+    previewLoad.classList.remove('visible')
   }
 }
 
@@ -510,7 +326,6 @@ function renderPresets() {
     const label = slot.querySelector('.preset-slot-label')
     if (p) {
       slot.classList.add('filled')
-      // Short label: theme + fontsize
       const themeLabel = p.selectedTheme === '__custom__'
         ? (p.customThemeLabel || 'Custom')
         : (state.themes[p.selectedTheme]?.label || p.selectedTheme)
@@ -553,9 +368,7 @@ function applyPreset(p) {
   setSeg('page-seg', state.pageSize)
   setSeg('orient-seg', state.landscape ? 'landscape' : 'portrait')
 
-  // Custom theme: only re-select if it's '__custom__' and json is present
   renderThemeList(themeSearch.value)
-  schedulePreview(0)
   schedulePdfPreview(1000)
 }
 
@@ -592,13 +405,12 @@ function bindEvents() {
   // File clear
   fileClear.addEventListener('click', clearFile)
 
-  // Language override — re-highlight on change
+  // Language override — regenerate PDF on change
   langOverride.addEventListener('change', () => {
     const v = langOverride.value.trim().toLowerCase()
     if (v && v !== state.lang) {
       state.lang = v
       prevLangLabel.textContent = v
-      schedulePreview(0)
       schedulePdfPreview()
     }
   })
@@ -618,29 +430,26 @@ function bindEvents() {
       state.customThemeLabel = json.name || file.name.replace('.json', '')
       state.selectedTheme = '__custom__'
       renderThemeList(themeSearch.value)
-      schedulePreview(0)
       schedulePdfPreview()
       toast('success', `主题「${state.customThemeLabel}」加载成功`)
     } catch (err) { toast('error', `主题加载失败：${err.message}`) }
     customInput.value = ''
   })
 
-  // ── CSS-only options (instant, no server) ──────────────────
+  // Options — all trigger PDF regeneration
   fontSizeRange.addEventListener('input', () => {
     state.fontSize = parseInt(fontSizeRange.value)
     fontSizeVal.textContent = state.fontSize
-    applyPreviewCss()
     schedulePdfPreview()
   })
   lineHeightRange.addEventListener('input', () => {
     state.lineHeight = parseFloat(lineHeightRange.value).toFixed(1)
     lineHeightVal.textContent = state.lineHeight
-    applyPreviewCss()
     schedulePdfPreview()
   })
-  wrapLines.addEventListener('change', () => { state.wrapLines = wrapLines.checked; applyPreviewCss(); schedulePdfPreview() })
-  lineNumbers.addEventListener('change', () => { state.lineNumbers = lineNumbers.checked; applyPreviewCss(); schedulePdfPreview() })
-  indentGuides.addEventListener('change', () => { state.indentGuides = indentGuides.checked; renderPreview(); schedulePdfPreview() })
+  wrapLines.addEventListener('change', () => { state.wrapLines = wrapLines.checked; schedulePdfPreview() })
+  lineNumbers.addEventListener('change', () => { state.lineNumbers = lineNumbers.checked; schedulePdfPreview() })
+  indentGuides.addEventListener('change', () => { state.indentGuides = indentGuides.checked; schedulePdfPreview() })
   scaleRange.addEventListener('input', () => {
     state.scale = parseFloat(scaleRange.value)
     const d = state.scale.toFixed(2).replace(/\.?0+$/, '')
@@ -648,18 +457,9 @@ function bindEvents() {
     schedulePdfPreview()
   })
 
-  // Indent — CSS only (but re-render when indent guides are on, because the
-  // injected <span class="indent-guide"> widths are tied to indentSize)
-  initSegGroup('indent-seg', val => {
-    state.indentSize = parseInt(val)
-    if (state.indentGuides) renderPreview()
-    else applyPreviewCss()
-    schedulePdfPreview()
-  })
-
-  // Page size + orientation — update page-break indicators in preview
-  initSegGroup('page-seg',   val => { state.pageSize  = val; insertPageBreaks(); schedulePdfPreview() })
-  initSegGroup('orient-seg', val => { state.landscape = val === 'landscape'; insertPageBreaks(); schedulePdfPreview() })
+  initSegGroup('indent-seg', val => { state.indentSize = parseInt(val); schedulePdfPreview() })
+  initSegGroup('page-seg',   val => { state.pageSize  = val; schedulePdfPreview() })
+  initSegGroup('orient-seg', val => { state.landscape = val === 'landscape'; schedulePdfPreview() })
 
   // Presets — click slot: apply if filled, save if empty; × clears
   presetsRow.addEventListener('click', e => {
