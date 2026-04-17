@@ -1,4 +1,4 @@
-# code2pdf
+# code2pdf（CN）
 
 将源代码导出为带有语法高亮的 PDF 文件，支持与 VSCode 完全兼容的颜色主题配置。
 
@@ -40,16 +40,11 @@ npm install
 npm install -g code2pdf
 ```
 
-### 使用 Claude Code 一键搭建
+### 使用 Claude Code 一键搭建（推荐）
 
-如果你使用 [Claude Code](https://claude.ai/code)，可以直接复制以下提示词让 AI 帮你完成安装和配置：
-
+直接复制以下提示词让 AI 帮你完成安装和配置：
 ```
-帮我克隆并安装 code2pdf 项目：
-1. git clone https://github.com/DrMaomao12345/code2pdf.git
-2. cd code2pdf && npm install
-3. 运行 npm run ui 启动 Web 界面
-4. 在浏览器中打开 http://localhost:3131
+帮我安装并且启动code2pdf项目： https://github.com/DrMaomao12345/code2pdf.git
 ```
 
 ---
@@ -286,7 +281,7 @@ npm run ui
 
 ## License
 
-MIT
+MIT License
 
 ---
 
@@ -334,14 +329,10 @@ npm install -g code2pdf
 
 ### One-click setup with Claude Code
 
-If you use [Claude Code](https://claude.ai/code), paste this prompt to set up automatically:
+Paste this prompt to set up automatically:
 
 ```
-Clone and set up the code2pdf project:
-1. git clone https://github.com/DrMaomao12345/code2pdf.git
-2. cd code2pdf && npm install
-3. Run npm run ui to start the Web UI
-4. Open http://localhost:3131 in the browser
+Set up the code2pdf project: git clone https://github.com/DrMaomao12345/code2pdf.git
 ```
 
 ---
@@ -558,4 +549,4 @@ npm run ui
 
 ## License
 
-MIT
+MIT License
