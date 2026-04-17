@@ -12,12 +12,12 @@ Export source code to beautiful PDF files with VSCode-compatible syntax highligh
 - **50+ 内置主题** — One Dark Pro、Dracula、Tokyo Night、GitHub、Catppuccin 等
 - **自定义主题** — 直接导入任何 VSCode `.json` 主题文件
 - **100+ 编程语言** — 自动识别语言，也可手动指定
-- **本地 Web UI** — `npm run ui` 启动浏览器可视化界面，拖拽文件、实时预览、分页提示
+- **本地 Web UI** — `npm run ui` 启动浏览器可视化界面，拖拽文件、参数变化自动生成 PDF 并内联预览
 - **精细排版** — 字号、行间距、缩进、缩进参考线、行号、自动换行均可调整
-- **VSCode 风格缩进参考线** — 连续竖直线标记缩进层级，预览与 PDF 导出完全一致
+- **VSCode 风格缩进参考线** — 连续竖直线标记缩进层级（空行处自动延续），预览与 PDF 导出完全一致
 - **多种页面尺寸** — A4、Letter、A3、Legal + 横向/纵向 + 内容缩放
 - **预设记忆** — Web UI 提供 3 个预设槽位，保存/加载常用设置组合
-- **精确分页预览** — 预览中实时显示 PDF 分页位置，支持自动换行行高计算
+- **PDF 实时预览** — 任意参数变化后自动重新生成 PDF，内联显示真实渲染结果
 - **CLI + Node.js API** — 命令行工具 + 可编程接口
 
 ---
@@ -243,7 +243,7 @@ code2pdf --list-languages
 ## 本地 Web UI / Local Web UI
 
 除 CLI 外，项目附带一个本地 Web 界面，可在浏览器中拖拽文件、切换主题、
-实时预览、并看到精确的分页提示：
+参数变化自动生成 PDF 并内联预览真实渲染结果：
 
 ```bash
 npm run ui
@@ -255,9 +255,10 @@ npm run ui
 
 - 拖拽或点击上传任意源代码文件
 - 侧边栏搜索 50+ 主题，支持导入自定义 VSCode `.json` 主题
-- 字号、行间距、缩进、行号、自动换行、缩进参考线即时生效
-- **VSCode 风格缩进参考线** — 连续竖直线，预览与 PDF 导出一致
-- 页面尺寸 / 横竖向 / 内容缩放可调，**预览中显示精确分页提示线**，所见即所得
+- 字号、行间距、缩进、行号、自动换行、缩进参考线任意调整
+- **PDF 实时预览** — 任意参数变化（主题/字号/纸张等）后自动重新生成，右侧直接内联显示真实 PDF
+- **VSCode 风格缩进参考线** — 连续竖直线，空行处自动延续，预览与导出完全一致
+- 页面尺寸 / 横竖向 / 内容缩放，所见即所得
 - **3 个预设槽位** — 保存常用设置组合，一键切换（持久化到 localStorage）
 - 深色 / 浅色界面主题一键切换
 
@@ -299,12 +300,12 @@ Export source code to beautiful PDF files with VSCode-compatible syntax highligh
 - **50+ built-in themes** — One Dark Pro, Dracula, Tokyo Night, GitHub, Catppuccin, and more
 - **Custom themes** — Import any VSCode `.json` theme file directly
 - **100+ programming languages** — Automatic language detection with manual override
-- **Local Web UI** — Run `npm run ui` for a browser-based visual interface with drag-and-drop, live preview, and page break indicators
+- **Local Web UI** — Run `npm run ui` for a browser-based visual interface with drag-and-drop and live inline PDF preview
 - **Fine-grained typography** — Font size, line height, indent size, indent guides, line numbers, word wrap
-- **VSCode-style indent guides** — Continuous vertical lines marking indent levels, consistent between preview and PDF export
+- **VSCode-style indent guides** — Continuous vertical lines marking indent levels (carried through blank lines), consistent between preview and PDF export
 - **Multiple page sizes** — A4, Letter, A3, Legal + portrait/landscape + content scaling
 - **Preset memory** — 3 preset slots in Web UI to save/load favorite setting combinations (persisted to localStorage)
-- **Accurate page break preview** — Real-time page break indicators in preview, with wrapped-line height measurement
+- **Live PDF preview** — Any parameter change (theme, font size, page size, etc.) auto-regenerates the PDF and displays it inline
 - **CLI + Node.js API** — Command-line tool + programmatic interface
 
 ---
@@ -501,7 +502,7 @@ Supports 100+ languages including: JavaScript/TypeScript, Python, Rust, Go, Java
 
 ## Web UI
 
-In addition to the CLI, the project includes a local web interface for drag-and-drop file upload, theme browsing, live preview, and accurate page break indicators:
+In addition to the CLI, the project includes a local web interface for drag-and-drop file upload, theme browsing, and live inline PDF preview:
 
 ```bash
 npm run ui
@@ -513,9 +514,10 @@ Features:
 
 - Drag-and-drop or click to upload any source code file
 - Search 50+ themes in the sidebar, import custom VSCode `.json` themes
-- Font size, line height, indent, line numbers, word wrap, indent guides — all update instantly
-- **VSCode-style indent guides** — continuous vertical lines, consistent between preview and PDF
-- Page size / orientation / content scaling with **accurate page break indicators** in preview
+- Font size, line height, indent, line numbers, word wrap, indent guides — all configurable
+- **Live PDF preview** — any parameter change auto-regenerates the PDF and displays it inline on the right
+- **VSCode-style indent guides** — continuous vertical lines carried through blank lines, consistent between preview and PDF
+- Page size / orientation / content scaling — what you see is what you get
 - **3 preset slots** — save and load favorite setting combinations (persisted to localStorage)
 - Light / dark UI theme toggle
 
