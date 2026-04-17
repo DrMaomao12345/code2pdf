@@ -75,6 +75,7 @@ app.post('/api/preview-pdf', async (req, res) => {
       fontSize = 12, lineHeight = 1.6, indentSize = 2,
       lineNumbers = false, wrapLines = true, indentGuides = false,
       pageSize = 'a4', landscape = false, scale = 1.0,
+      margin = 12, fullPageBg = false,
     } = req.body
 
     const { themeId, customTheme } = customThemeJson
@@ -86,6 +87,7 @@ app.post('/api/preview-pdf', async (req, res) => {
       codeHtml, filename, language: lang, themeId,
       bg, fg, fontSize, lineHeight, indentSize,
       lineNumbers, wrapLines, indentGuides, pageSize,
+      margin, fullPageBg,
     })
 
     await generatePdf({ html, outputPath: tmpPath, pageSize, landscape, scale })
@@ -115,6 +117,7 @@ app.post('/api/export', async (req, res) => {
       fontSize = 12, lineHeight = 1.6, indentSize = 2,
       lineNumbers = false, wrapLines = true, indentGuides = false,
       pageSize = 'a4', landscape = false, scale = 1.0,
+      margin = 12, fullPageBg = false,
     } = req.body
 
     const { themeId, customTheme } = customThemeJson
@@ -126,6 +129,7 @@ app.post('/api/export', async (req, res) => {
       codeHtml, filename, language: lang, themeId,
       bg, fg, fontSize, lineHeight, indentSize,
       lineNumbers, wrapLines, indentGuides, pageSize,
+      margin, fullPageBg,
     })
 
     await generatePdf({ html, outputPath: tmpPath, pageSize, landscape, scale })

@@ -38,6 +38,7 @@ const state = {
   fontSize: 12, lineHeight: 1.6, indentSize: 2,
   lineNumbers: false, wrapLines: true, indentGuides: false,
   pageSize: 'a4', landscape: false, scale: 1.0,
+  margin: 12, fullPageBg: false,
   previewBg: '#282c34',
   exporting: false,
   uiMode: 'light',
@@ -53,6 +54,7 @@ const PRESET_KEYS = [
   'fontSize', 'lineHeight', 'indentSize',
   'lineNumbers', 'wrapLines', 'indentGuides',
   'pageSize', 'landscape', 'scale',
+  'margin', 'fullPageBg',
 ]
 const PRESETS_LS_KEY = 'code2pdf-presets'
 
@@ -78,6 +80,9 @@ const wrapLines     = $('wrap-lines')
 const indentGuides  = $('indent-guides')
 const scaleRange    = $('scale')
 const scaleVal      = $('scale-val')
+const marginRange   = $('margin')
+const marginVal     = $('margin-val')
+const fullPageBgChk = $('full-page-bg')
 const exportBtn     = $('export-btn')
 const exportLabel   = $('export-label')
 const uiModeBtn     = $('ui-mode-btn')
@@ -245,6 +250,7 @@ async function fetchPdfPreview() {
       fontSize: state.fontSize, lineHeight: state.lineHeight, indentSize: state.indentSize,
       lineNumbers: state.lineNumbers, wrapLines: state.wrapLines, indentGuides: state.indentGuides,
       pageSize: state.pageSize, landscape: state.landscape, scale: state.scale,
+      margin: state.margin, fullPageBg: state.fullPageBg,
     }
     const res = await fetch('/api/preview-pdf', {
       method: 'POST',
@@ -288,6 +294,7 @@ async function exportPdf() {
       fontSize: state.fontSize, lineHeight: state.lineHeight, indentSize: state.indentSize,
       lineNumbers: state.lineNumbers, wrapLines: state.wrapLines, indentGuides: state.indentGuides,
       pageSize: state.pageSize, landscape: state.landscape, scale: state.scale,
+      margin: state.margin, fullPageBg: state.fullPageBg,
     }
     const res = await fetch('/api/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     if (!res.ok) throw new Error((await res.json()).error || 'Unknown error')
@@ -361,6 +368,9 @@ function applyPreset(p) {
   indentGuides.checked = state.indentGuides
   scaleRange.value = state.scale
   scaleVal.textContent = state.scale.toFixed(2).replace(/\.?0+$/, '') + '×'
+  marginRange.value = state.margin
+  marginVal.textContent = state.margin + 'mm'
+  fullPageBgChk.checked = state.fullPageBg
 
   const setSeg = (id, val) => {
     const g = $(id)
@@ -459,6 +469,13 @@ function bindEvents() {
     scaleVal.textContent = d + '×'
     schedulePdfPreview()
   })
+
+  marginRange.addEventListener('input', () => {
+    state.margin = parseInt(marginRange.value)
+    marginVal.textContent = state.margin + 'mm'
+    schedulePdfPreview()
+  })
+  fullPageBgChk.addEventListener('change', () => { state.fullPageBg = fullPageBgChk.checked; schedulePdfPreview() })
 
   initSegGroup('indent-seg', val => { state.indentSize = parseInt(val); schedulePdfPreview() })
   initSegGroup('page-seg',   val => { state.pageSize  = val; schedulePdfPreview() })

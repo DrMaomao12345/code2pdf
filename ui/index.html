@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>code2pdf</title>
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
   <div id="app">
@@ -160,6 +160,24 @@
             </div>
           </div>
 
+          <!-- Margin -->
+          <div class="opt-row">
+            <span class="opt-label">边距</span>
+            <div class="opt-right">
+              <input type="range" id="margin" min="0" max="30" value="12" step="1">
+              <span class="range-val" id="margin-val">12mm</span>
+            </div>
+          </div>
+
+          <!-- Full page background -->
+          <div class="toggles-row">
+            <label class="opt-check">
+              <input type="checkbox" id="full-page-bg">
+              <span class="check-box"></span>
+              <span>整页背景色</span>
+            </label>
+          </div>
+
         </div>
       </div>
 
@@ -240,6 +258,6 @@
   </div>
 
   <div id="toasts"></div>
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

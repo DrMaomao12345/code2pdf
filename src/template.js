@@ -69,6 +69,8 @@ export function buildHtml({
   wrapLines = true,
   indentGuides = false,
   pageSize = 'A4',
+  margin = 12,
+  fullPageBg = false,
 }) {
   const dark = isDark(bg)
   const headerBg = dark ? adjustColor(bg, 15) : adjustColor(bg, -15)
@@ -177,7 +179,8 @@ export function buildHtml({
   <style>
     @page {
       size: ${pageSize};
-      margin: 14mm 12mm 16mm 12mm;
+      margin: ${margin + 2}mm ${margin}mm ${margin + 4}mm ${margin}mm;
+      ${fullPageBg ? `background: ${bg};` : ''}
     }
 
     * {
