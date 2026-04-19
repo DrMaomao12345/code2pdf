@@ -7,6 +7,11 @@
 import path from 'path'
 import { BUILTIN_THEMES } from './themeManager.js'
 
+// Paper dimensions in mm (portrait). Used to set a reliable min-height for
+// full-page background fill rather than relying on 100vh in print mode.
+const PAGE_HEIGHTS_MM = { a4: 297, letter: 279.4, legal: 355.6, a3: 420, a5: 210, tabloid: 431.8 }
+const PAGE_WIDTHS_MM  = { a4: 210, letter: 215.9, legal: 215.9, a3: 297, a5: 148, tabloid: 279.4 }
+
 /**
  * Normalize a hex color to 6-digit form (e.g. "#fff" -> "#ffffff").
  */
@@ -55,6 +60,36 @@ function isDark(hex) {
  * @param {string} params.pageSize       - PDF page size (A4, Letter, etc.)
  * @returns {string} Full HTML document
  */
+/**
+ * Build the Puppeteer displayHeaderFooter header template string.
+ * In fullPageBg mode this fills the reserved top-margin area with the theme
+ * background color on EVERY page (the only reliable way to do this, since
+ * @page margin areas are NOT painted by html/body backgrounds in Chromium).
+ * IMPORTANT: No <style> tags — they corrupt the main page rendering.
+ */
+export function buildHeaderTemplate({ bg = null, fullPageBg = false, marginV = 12 }) {
+  // In fullPageBg mode @page margin-top = 0, so no header template area exists.
+  // Always return an empty placeholder.
+  return '<div></div>'
+}
+
+/**
+ * Build the Puppeteer displayHeaderFooter footer template string.
+ * Uses Puppeteer's special <span class="pageNumber"> / <span class="totalPages">
+ * placeholders which are the ONLY reliable way to get page numbers in Puppeteer.
+ */
+export function buildFooterTemplate({ displayName, lineNumColor, marginH, marginV = 12, bg = null, fullPageBg = false }) {
+  // The footer template is rendered inside a Puppeteer-managed iframe.
+  // IMPORTANT: Do NOT add a <style> tag or position:fixed — both corrupt the
+  // main page rendering and make all content invisible. Use inline styles only.
+  //
+  // In fullPageBg mode, the main page's .page-bg div (position:fixed; bottom:-Xmm)
+  // extends into the footer margin area and provides the theme background color
+  // for the ENTIRE footer — including the bottom ~5mm that the footer template
+  // iframe can never paint (Chromium limitation). No background is needed here.
+  return `<div style="width:100%;font-family:Menlo,Monaco,Consolas,'Courier New',monospace;font-size:9px;color:${lineNumColor};padding:0 ${marginH}mm;box-sizing:border-box;display:flex;justify-content:space-between;align-items:center;"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%;">${displayName}</span><span style="white-space:nowrap;flex-shrink:0;"><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>`
+}
+
 export function buildHtml({
   codeHtml,
   filename,
@@ -69,6 +104,7 @@ export function buildHtml({
   wrapLines = true,
   indentGuides = false,
   pageSize = 'A4',
+  landscape = false,
   marginH = 12,
   marginV = 12,
   fullPageBg = false,
@@ -174,13 +210,31 @@ export function buildHtml({
   // When fullPageBg: use @page margin:0 + body padding so body background
   // fills the entire page (Chromium ignores @page{background} and html/body
   // backgrounds only paint the content box, not the margin area).
-  // Page numbers are rendered via position:fixed instead of @page margin boxes.
+  // Page numbers are rendered via Puppeteer displayHeaderFooter instead of @page margin boxes.
   const pTop    = marginV + 2
   const pRight  = marginH
   const pBottom = marginV + 4
   const pLeft   = marginH
 
-  return `<!DOCTYPE html>
+  // Compute the physical page height in mm so we can use it as a reliable
+  // min-height (100vh is not reliable in Chromium print mode when setViewport
+  // is used — the two coordinate systems don't always agree).
+  const pageSizeKey = pageSize.toLowerCase()
+  const rawH = landscape
+    ? (PAGE_WIDTHS_MM[pageSizeKey]  || 210)
+    : (PAGE_HEIGHTS_MM[pageSizeKey] || 297)
+  const rawW = landscape
+    ? (PAGE_HEIGHTS_MM[pageSizeKey] || 297)
+    : (PAGE_WIDTHS_MM[pageSizeKey]  || 210)
+  // In fullPageBg mode (@page margin:0) the body fills the whole page,
+  // so min-height equals the full page height.
+  // In normal mode (@page margin set) we don't need to force height.
+  const pageHeightMm = rawH
+
+  const headerHtml = buildHeaderTemplate({ bg, fullPageBg, marginV })
+  const footerHtml = buildFooterTemplate({ displayName, lineNumColor, marginH, marginV, bg, fullPageBg })
+
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -188,8 +242,8 @@ export function buildHtml({
   <title>${displayName}</title>
   <style>
     @page {
-      size: ${pageSize};
-      margin: ${fullPageBg ? 0 : `${pTop}mm ${pRight}mm ${pBottom}mm ${pLeft}mm`};
+      size: ${pageSize} ${landscape ? 'landscape' : 'portrait'};
+      margin: ${pTop}mm ${pRight}mm ${pBottom}mm ${pLeft}mm;
     }
 
     * {
@@ -198,9 +252,8 @@ export function buildHtml({
       padding: 0;
     }
 
-    html, body {
+    html {
       background: ${bg};
-      width: 100%;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -212,7 +265,8 @@ export function buildHtml({
       line-height: ${lineHeight};
       color: ${fg};
       background: ${bg};
-      ${fullPageBg ? `padding: ${pTop}mm ${pRight}mm ${pBottom}mm ${pLeft}mm;` : ''}
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
 
     /* ── File header bar ──────────────────────────────────── */
@@ -221,7 +275,7 @@ export function buildHtml({
       align-items: center;
       gap: 10px;
       padding: 8px 14px;
-      background: ${headerBg};
+      background: transparent;
       border-bottom: 1px solid ${borderColor};
       font-size: ${Math.max(fontSize - 1, 9)}px;
     }
@@ -271,6 +325,7 @@ export function buildHtml({
       margin: 0 !important;
       padding: ${lineNumbers ? '14px 14px 14px 0' : '14px'} !important;
       overflow: visible !important;
+      max-width: 100%;
       white-space: ${wrapLines ? 'pre-wrap' : 'pre'} !important;
       word-break: ${wrapLines ? 'break-all' : 'normal'} !important;
       font-family: inherit !important;
@@ -336,43 +391,9 @@ export function buildHtml({
       font-family: inherit;
     }` : ''}
 
-    /* ── Page footer ─────────────────────────────────────── */
-    ${fullPageBg ? `
-    /* position:fixed repeats on every page in print mode */
-    .pdf-footer {
-      position: fixed;
-      bottom: ${marginV}mm;
-      left:   ${marginH}mm;
-      right:  ${marginH}mm;
-      display: flex;
-      justify-content: space-between;
-      font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
-      font-size: 8px;
-      color: ${lineNumColor};
-    }
-    .pdf-footer-page::after  { content: counter(page) " / " counter(pages); }
-    .pdf-footer-name::after  { content: "${displayName}"; }
-    ` : `
-    @page {
-      @bottom-right {
-        content: counter(page) " / " counter(pages);
-        font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
-        font-size: 8px;
-        color: ${lineNumColor};
-        padding-top: 4mm;
-      }
-      @bottom-left {
-        content: "${displayName}";
-        font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
-        font-size: 8px;
-        color: ${lineNumColor};
-        padding-top: 4mm;
-      }
-    }`}
   </style>
 </head>
 <body>
-  ${fullPageBg ? `<div class="pdf-footer"><span class="pdf-footer-name"></span><span class="pdf-footer-page"></span></div>` : ''}
   <div class="file-header">
     <div class="file-dot"></div>
     <span class="file-name">${displayName}</span>
@@ -382,4 +403,6 @@ export function buildHtml({
   ${processedHtml}
 </body>
 </html>`
+
+  return { html, headerHtml, footerHtml }
 }

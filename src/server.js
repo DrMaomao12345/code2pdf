@@ -83,14 +83,14 @@ app.post('/api/preview-pdf', async (req, res) => {
       : await resolveTheme(theme)
 
     const { html: codeHtml, bg, fg } = await highlight(code, { lang, themeId, customTheme })
-    const html = buildHtml({
+    const { html, headerHtml, footerHtml } = buildHtml({
       codeHtml, filename, language: lang, themeId,
       bg, fg, fontSize, lineHeight, indentSize,
-      lineNumbers, wrapLines, indentGuides, pageSize,
+      lineNumbers, wrapLines, indentGuides, pageSize, landscape,
       marginH, marginV, fullPageBg,
     })
 
-    await generatePdf({ html, outputPath: tmpPath, pageSize, landscape, scale })
+    await generatePdf({ html, headerHtml, footerHtml, outputPath: tmpPath, pageSize, landscape, scale, marginH, marginV, fullPageBg, bg })
 
     res.setHeader('Content-Type', 'application/pdf')
     const stream = createReadStream(tmpPath)
@@ -125,14 +125,14 @@ app.post('/api/export', async (req, res) => {
       : await resolveTheme(theme)
 
     const { html: codeHtml, bg, fg } = await highlight(code, { lang, themeId, customTheme })
-    const html = buildHtml({
+    const { html, headerHtml, footerHtml } = buildHtml({
       codeHtml, filename, language: lang, themeId,
       bg, fg, fontSize, lineHeight, indentSize,
-      lineNumbers, wrapLines, indentGuides, pageSize,
+      lineNumbers, wrapLines, indentGuides, pageSize, landscape,
       marginH, marginV, fullPageBg,
     })
 
-    await generatePdf({ html, outputPath: tmpPath, pageSize, landscape, scale })
+    await generatePdf({ html, headerHtml, footerHtml, outputPath: tmpPath, pageSize, landscape, scale, marginH, marginV, fullPageBg, bg })
 
     const baseName = path.basename(filename, path.extname(filename))
     res.setHeader('Content-Type', 'application/pdf')
