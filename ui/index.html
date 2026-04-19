@@ -267,6 +267,19 @@
   </div>
 
   <div id="toasts"></div>
+
+  <!-- Export loading overlay -->
+  <div id="export-overlay" class="export-overlay" aria-hidden="true">
+    <div class="export-overlay-inner">
+      <svg class="export-overlay-svg" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+        <g id="eo-group">
+          <path id="eo-path" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" opacity="0.12"></path>
+        </g>
+      </svg>
+      <div class="export-overlay-label">生成中…</div>
+    </div>
+  </div>
+
   <script src="app.js?v=5"></script>
 </body>
 </html>
