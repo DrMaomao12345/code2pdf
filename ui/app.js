@@ -534,7 +534,8 @@ function bindEvents() {
 // ── Start ─────────────────────────────────────────────────────
 init()
 
-// ── Export overlay — Hypotrochoid Loop ────────────────────────
+// ── Export overlay ────────────────────────────────────────────
+// Animation is inlined in index.html — immune to JS cache.
 const _exportOverlay = document.getElementById('export-overlay')
 
 function showExportOverlay() {
@@ -545,68 +546,3 @@ function hideExportOverlay() {
   _exportOverlay.classList.remove('visible')
   _exportOverlay.setAttribute('aria-hidden', 'true')
 }
-
-;(function initHypotrochoid() {
-  const SVG_NS = 'http://www.w3.org/2000/svg'
-  const group  = document.getElementById('eo-group')
-  const path   = document.getElementById('eo-path')
-
-  const C = {
-    particleCount: 45, trailSpan: 0.48,
-    durationMs: 2400,  pulseDurationMs: 2200,
-    strokeWidth: 3.3,
-    spiroR: 8.2,  spiror: 2.7,  spirorBoost: 0.45,
-    spirod: 4.8,  spirodBoost: 1.2,  spiroScale: 3.05,
-  }
-
-  path.setAttribute('stroke-width', String(C.strokeWidth))
-
-  const particles = Array.from({ length: C.particleCount }, () => {
-    const c = document.createElementNS(SVG_NS, 'circle')
-    c.setAttribute('fill', 'currentColor')
-    group.appendChild(c)
-    return c
-  })
-
-  function detailScale(t) {
-    const p = (t % C.pulseDurationMs) / C.pulseDurationMs
-    return 0.52 + ((Math.sin(p * Math.PI * 2 + 0.55) + 1) / 2) * 0.48
-  }
-
-  function pt(progress, ds) {
-    const t = progress * Math.PI * 2
-    const r = C.spiror + ds * C.spirorBoost
-    const d = C.spirod + ds * C.spirodBoost
-    const R = C.spiroR
-    return {
-      x: 50 + ((R - r) * Math.cos(t) + d * Math.cos(((R - r) / r) * t)) * C.spiroScale,
-      y: 50 + ((R - r) * Math.sin(t) - d * Math.sin(((R - r) / r) * t)) * C.spiroScale,
-    }
-  }
-
-  function buildPath(ds, steps = 480) {
-    return Array.from({ length: steps + 1 }, (_, i) => {
-      const p = pt(i / steps, ds)
-      return `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`
-    }).join(' ')
-  }
-
-  const t0 = performance.now()
-  function render(now) {
-    const time     = now - t0
-    const progress = (time % C.durationMs) / C.durationMs
-    const ds       = detailScale(time)
-    path.setAttribute('d', buildPath(ds))
-    particles.forEach((node, i) => {
-      const tail = i / (C.particleCount - 1)
-      const p    = pt(((progress - tail * C.trailSpan) % 1 + 1) % 1, ds)
-      const fade = Math.pow(1 - tail, 0.56)
-      node.setAttribute('cx', p.x.toFixed(2))
-      node.setAttribute('cy', p.y.toFixed(2))
-      node.setAttribute('r',  (0.9 + fade * 2.7).toFixed(2))
-      node.setAttribute('opacity', (0.04 + fade * 0.96).toFixed(3))
-    })
-    requestAnimationFrame(render)
-  }
-  requestAnimationFrame(render)
-})()

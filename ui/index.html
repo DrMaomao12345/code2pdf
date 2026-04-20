@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>code2pdf</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <div id="app">
@@ -254,7 +254,11 @@
 
       <!-- Loading overlay -->
       <div class="preview-loading" id="preview-loading">
-        <div class="preview-loading-spinner"></div>
+        <svg class="preview-loading-svg" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+          <g id="pl-group">
+            <path id="pl-path" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" opacity="0.1"></path>
+          </g>
+        </svg>
       </div>
 
       <!-- PDF Preview (replaces code preview) -->
@@ -273,13 +277,96 @@
     <div class="export-overlay-inner">
       <svg class="export-overlay-svg" viewBox="0 0 100 100" fill="none" aria-hidden="true">
         <g id="eo-group">
-          <path id="eo-path" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" opacity="0.12"></path>
+          <path id="eo-path" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" opacity="0.1"></path>
         </g>
       </svg>
       <div class="export-overlay-label">生成中…</div>
     </div>
   </div>
 
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=9"></script>
+
+  <!-- Hypotrochoid Loop — inline so it's never cached separately -->
+  <script>
+  (function () {
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+    var C = {
+      particleCount: 45, trailSpan: 0.48,
+      durationMs: 2400, pulseDurationMs: 2200,
+      strokeWidth: 3.3,
+      spiroR: 8.2, spiror: 2.7, spirorBoost: 0.45,
+      spirod: 4.8, spirodBoost: 1.2, spiroScale: 3.05,
+    };
+
+    // 初始化一套 SVG 粒子，返回 { path, particles }
+    function initSvg(groupId, pathId) {
+      var group = document.getElementById(groupId);
+      var path  = document.getElementById(pathId);
+      path.setAttribute('stroke-width', String(C.strokeWidth));
+      var particles = [];
+      for (var i = 0; i < C.particleCount; i++) {
+        var c = document.createElementNS(SVG_NS, 'circle');
+        c.setAttribute('fill', 'currentColor');
+        group.appendChild(c);
+        particles.push(c);
+      }
+      return { path: path, particles: particles };
+    }
+
+    var exportSvg  = initSvg('eo-group', 'eo-path');   // 导出全屏 overlay
+    var previewSvg = initSvg('pl-group', 'pl-path');   // 预览面板 overlay
+
+    function norm(p) { return ((p % 1) + 1) % 1; }
+
+    function getDs(time) {
+      var pp = (time % C.pulseDurationMs) / C.pulseDurationMs;
+      return 0.52 + ((Math.sin(pp * Math.PI * 2 + 0.55) + 1) / 2) * 0.48;
+    }
+
+    function pt(progress, ds) {
+      var t = progress * Math.PI * 2;
+      var r = C.spiror + ds * C.spirorBoost;
+      var d = C.spirod + ds * C.spirodBoost;
+      var R = C.spiroR;
+      return {
+        x: 50 + ((R - r) * Math.cos(t) + d * Math.cos(((R - r) / r) * t)) * C.spiroScale,
+        y: 50 + ((R - r) * Math.sin(t) - d * Math.sin(((R - r) / r) * t)) * C.spiroScale,
+      };
+    }
+
+    function buildPath(ds) {
+      var steps = 480, parts = [];
+      for (var i = 0; i <= steps; i++) {
+        var p = pt(i / steps, ds);
+        parts.push((i === 0 ? 'M' : 'L') + ' ' + p.x.toFixed(2) + ' ' + p.y.toFixed(2));
+      }
+      return parts.join(' ');
+    }
+
+    function updateSvg(svg, progress, ds) {
+      svg.path.setAttribute('d', buildPath(ds));
+      for (var i = 0; i < svg.particles.length; i++) {
+        var tail = i / (C.particleCount - 1);
+        var p    = pt(norm(progress - tail * C.trailSpan), ds);
+        var fade = Math.pow(1 - tail, 0.56);
+        svg.particles[i].setAttribute('cx', p.x.toFixed(2));
+        svg.particles[i].setAttribute('cy', p.y.toFixed(2));
+        svg.particles[i].setAttribute('r',  (0.9 + fade * 2.7).toFixed(2));
+        svg.particles[i].setAttribute('opacity', (0.04 + fade * 0.96).toFixed(3));
+      }
+    }
+
+    var startedAt = performance.now();
+    function render(now) {
+      var time     = now - startedAt;
+      var progress = (time % C.durationMs) / C.durationMs;
+      var ds       = getDs(time);
+      updateSvg(exportSvg,  progress, ds);
+      updateSvg(previewSvg, progress, ds);
+      requestAnimationFrame(render);
+    }
+    requestAnimationFrame(render);
+  })();
+  </script>
 </body>
 </html>

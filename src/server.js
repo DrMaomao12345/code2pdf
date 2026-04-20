@@ -135,8 +135,10 @@ app.post('/api/export', async (req, res) => {
     await generatePdf({ html, headerHtml, footerHtml, outputPath: tmpPath, pageSize, landscape, scale, marginH, marginV, fullPageBg, bg })
 
     const baseName = path.basename(filename, path.extname(filename))
+    // RFC 5987: handles non-ASCII filenames (Chinese, emoji, etc.)
+    const encoded = encodeURIComponent(baseName + '.pdf')
     res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader('Content-Disposition', `attachment; filename="${baseName}.pdf"`)
+    res.setHeader('Content-Disposition', `attachment; filename="download.pdf"; filename*=UTF-8''${encoded}`)
 
     const stream = createReadStream(tmpPath)
     stream.pipe(res)
